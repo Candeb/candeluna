@@ -1,0 +1,65 @@
+.service-page {
+  position: relative;
+  z-index: 3;
+  min-height: 100vh;
+  padding: 48px 24px 80px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.service-page__back {
+  display: inline-block;
+  margin-bottom: 32px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(160, 210, 255, 0.7);
+  text-decoration: none;
+}
+
+.service-page__tag {
+  display: block;
+  margin-bottom: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(192, 132, 252, 0.75);
+}
+
+.service-page h1 {
+  margin: 0 0 16px;
+  font-size: clamp(32px, 6vw, 48px);
+  letter-spacing: -0.03em;
+}
+
+.service-page__summary {
+  margin: 0 0 32px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(220, 230, 255, 0.72);
+}
+
+.service-page__placeholder {
+  font-size: 14px;
+  color: rgba(180, 190, 210, 0.55);
+}
+
+@media (max-width: 768px) {
+  .service-page {
+    padding:
+      max(20px, var(--safe-top))
+      max(16px, var(--safe-right))
+      max(56px, var(--safe-bottom))
+      max(16px, var(--safe-left));
+  }
+
+  .service-page h1 {
+    font-size: clamp(26px, 8vw, 36px);
+  }
+
+  .service-page__summary {
+    font-size: 15px;
+  }
+}

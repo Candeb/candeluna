@@ -1,0 +1,58 @@
+.video-scroll-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #030308;
+}
+
+.video-scroll-bg__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1.28);
+}
+
+.video-scroll-bg__video {
+  position: absolute;
+  min-width: 130vw;
+  min-height: 130vh;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  opacity: 0;
+}
+
+.video-scroll-bg__shade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(3, 3, 8, 0.1) 0%,
+    rgba(3, 3, 8, 0.45) 55%,
+    rgba(3, 3, 8, 0.72) 100%
+  );
+}
+
+@media (max-width: 768px) {
+  .video-scroll-bg__layer {
+    transform: scale(1.45);
+  }
+
+  .video-scroll-bg__video {
+    min-width: 140vw;
+    min-height: 140vh;
+  }
+
+  .video-scroll-bg__shade {
+    background: radial-gradient(
+      circle at 50% 38%,
+      rgba(3, 3, 8, 0.08) 0%,
+      rgba(3, 3, 8, 0.5) 58%,
+      rgba(3, 3, 8, 0.78) 100%
+    );
+  }
+}

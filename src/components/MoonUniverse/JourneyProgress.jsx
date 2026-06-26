@@ -12,6 +12,7 @@ export default function JourneyProgress({
 
   const seekFromPointer = useCallback(
     (clientX) => {
+      if (!onSeek) return
       const bar = barRef.current
       if (!bar) return
       const rect = bar.getBoundingClientRect()
@@ -41,7 +42,9 @@ export default function JourneyProgress({
   const hint =
     activeChapter < 0
       ? 'deslizá para iniciar el viaje'
-      : `región ${String(activeChapter + 1).padStart(2, '0')} · ${moonShots[activeChapter].service.title}`
+      : activeChapter >= moonShots.length - 1
+        ? 'última región · deslizá una vez más para el cierre'
+        : `región ${String(activeChapter + 1).padStart(2, '0')} · ${moonShots[activeChapter].service.title}`
 
   const progressPercent = Math.round(progress * 100)
 

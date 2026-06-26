@@ -23,8 +23,8 @@
   pointer-events: none;
   background: radial-gradient(
     circle at 50% 48%,
-    transparent 42%,
-    rgba(0, 0, 0, 0.12) 72%,
+    transparent 28%,
+    rgba(0, 0, 0, 0.1) 58%,
     rgba(0, 0, 0, 0.32) 100%
   );
 }
@@ -91,6 +91,34 @@
   pointer-events: none;
 }
 
+.cinematic__viewport.is-exploring .cinematic__moon {
+  z-index: 1;
+}
+
+.cinematic__viewport.is-exploring .moon-hero__canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.cinematic__viewport.is-moon-drag .cinematic__moon {
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.cinematic__viewport.is-moon-drag .moon-hero__canvas {
+  pointer-events: auto !important;
+  touch-action: none;
+}
+
+.cinematic__viewport.is-moon-drag .cinematic__cards {
+  visibility: hidden;
+  pointer-events: none !important;
+}
+
+.cinematic__viewport.is-moon-drag .cinematic__cards * {
+  pointer-events: none !important;
+}
+
 .cinematic__moon .moon-hero {
   width: 100vw;
   height: 100vh;
@@ -111,6 +139,17 @@
   pointer-events: none;
 }
 
+.cinematic__viewport.is-exploring .cinematic__cards,
+.cinematic__viewport.is-marker-flow .cinematic__cards {
+  z-index: 20;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+.cinematic__viewport.is-marker-flow .screen-marker {
+  z-index: 12;
+}
+
 .cinematic__footer {
   position: absolute;
   bottom: clamp(24px, 5vh, 48px);
@@ -129,6 +168,77 @@
 .cinematic__track {
   width: 100%;
   pointer-events: none;
+}
+
+.cinematic__finale-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(
+      circle at 50% 44%,
+      transparent 14%,
+      rgba(0, 0, 0, 0.18) 38%,
+      rgba(0, 0, 0, 0.52) 62%,
+      rgba(0, 0, 0, 0.78) 100%
+    ),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.72) 100%);
+}
+
+.cinematic__finale-stars {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 28% 72%, rgba(220, 235, 255, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 44% 32%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1px 1px at 58% 64%, rgba(200, 220, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 72% 22%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 84% 48%, rgba(230, 240, 255, 0.75), transparent),
+    radial-gradient(1px 1px at 18% 88%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 36% 12%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 66% 82%, rgba(210, 225, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 92% 76%, rgba(255, 255, 255, 0.8), transparent);
+  background-size: 100% 100%;
+  filter: blur(0.2px);
+}
+
+.cinematic__viewport.is-finale .cinematic__vignette {
+  background: radial-gradient(
+    circle at 50% 46%,
+    transparent 18%,
+    rgba(0, 0, 0, 0.28) 52%,
+    rgba(0, 0, 0, 0.72) 100%
+  );
+}
+
+.cinematic__viewport.is-finale .cinematic__moon {
+  z-index: 1;
+  pointer-events: none;
+  opacity: var(--moon-backdrop-opacity, 1);
+  transform: scale(calc(0.84 + var(--moon-backdrop-opacity, 1) * 0.12));
+  filter: brightness(calc(0.22 + var(--moon-backdrop-opacity, 1) * 0.55));
+}
+
+.cinematic__viewport.is-finale .moon-hero__flare {
+  opacity: calc(var(--moon-backdrop-opacity, 1) * 0.2);
+}
+
+.cinematic__viewport.is-finale-complete .cinematic__header {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.cinematic__viewport.is-finale-complete .cinematic__footer {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* —— Tablet y móvil —— */

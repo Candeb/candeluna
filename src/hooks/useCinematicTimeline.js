@@ -1,10 +1,30 @@
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import * as THREE from 'three'
 import { INTRO_SHOT, moonShots, getPullbackForShot } from '../data/moonShots'
-import { CINEMATIC_TIMING, getActiveChapterFromProgress } from '../data/cinematicTimeline'
+import {
+  FINAL_SEQUENCE_TIMING,
+  FINALE_CAMERA,
+  FINALE_LIGHT_END,
+  FINALE_LIGHT_MID,
+  FINALE_LIGHT_START,
+  FINALE_MOON_DRIFT,
+} from '../data/finalMoonSequence'
+import { CINEMATIC_TIMING, getActiveChapterFromProgress, SCROLL_SNAP_POINTS } from '../data/cinematicTimeline'
 
 gsap.registerPlugin(ScrollTrigger)
+
+export function createMoonDragState() {
+  return {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    active: false,
+    quaternion: new THREE.Quaternion(),
+  }
+}
 
 export function createCinematicState() {
   return {
@@ -12,42 +32,257 @@ export function createCinematicState() {
     target: { ...INTRO_SHOT.target },
     moon: { ...INTRO_SHOT.moon },
     fov: INTRO_SHOT.fov,
+    lighting: { ...FINALE_LIGHT_START },
+    stars: 0,
+    darkness: 0,
+    videoDim: 1,
+    moonVisible: 1,
+    moonDrag: createMoonDragState(),
+    dragEnabled: true,
+    markersEnabled: true,
+    activeMarkerIndex: -1,
+    beaconOpacity: 0,
+    beaconYOffset: 0.14,
+    beaconScale: 0.55,
+    scrollProgress: 0,
+    visualApproachT: 0,
+    cameraSettleZDelta: Infinity,
+    cameraSettleYDelta: Infinity,
+    moonSettleAngle: Infinity,
+    moonHold: null,
   }
 }
 
-function setCardHidden(el) {
-  if (!el) return
-  gsap.set(el, {
-    opacity: 0,
-    filter: 'blur(14px)',
-    pointerEvents: 'none',
+import { hideAllMarkers } from './markerAnimations'
+
+export function buildFinalMoonSequence({
+  state,
+  lastShot,
+  outroRefs,
+  journeyFooterRef,
+}) {
+  const {
+    pauseDur,
+    dollyDur,
+    lightDur,
+    starsDur,
+    starsDelay,
+    shadeMaxOpacity,
+    messageDur,
+    ctaDelay,
+    ctaDur,
+    restartHold,
+    restartDur,
+  } = FINAL_SEQUENCE_TIMING
+
+  const ease = 'sine.inOut'
+  const finalMoonSequence = gsap.timeline({ defaults: { ease }, paused: true })
+
+  const dollyStart = pauseDur
+  const lightStart = pauseDur + 0.4
+  const starsStart = lightStart + lightDur * 0.45
+  const messageStart = dollyStart + dollyDur + 0.5
+  const ctaStart = messageStart + ctaDelay
+  const restartStart = ctaStart + ctaDur + restartHold
+
+  finalMoonSequence.call(() => {
+    state.markersEnabled = false
+    state.activeMarkerIndex = -1
+    state.beaconOpacity = 0
+  }, null, 0)
+
+  if (journeyFooterRef?.current) {
+    finalMoonSequence.to(
+      journeyFooterRef.current,
+      { opacity: 0, pointerEvents: 'none', duration: 0.8, ease: 'power1.inOut' },
+      0,
+    )
+  }
+
+  finalMoonSequence.to({}, { duration: pauseDur }, 0)
+
+  finalMoonSequence.to(
+    state.camera,
+    {
+      x: FINALE_CAMERA.x,
+      y: FINALE_CAMERA.y,
+      z: FINALE_CAMERA.z,
+      duration: dollyDur,
+      ease,
+    },
+    dollyStart,
+  )
+  finalMoonSequence.to(
+    state,
+    { fov: FINALE_CAMERA.fov, duration: dollyDur, ease },
+    dollyStart,
+  )
+
+  if (lastShot) {
+    finalMoonSequence.to(
+      state.moon,
+      {
+        y: lastShot.moon.y + FINALE_MOON_DRIFT,
+        duration: dollyDur,
+        ease,
+      },
+      dollyStart,
+    )
+  }
+
+  finalMoonSequence.to(
+    state.lighting,
+    { ...FINALE_LIGHT_MID, duration: lightDur * 0.5, ease },
+    lightStart,
+  )
+  finalMoonSequence.to(
+    state.lighting,
+    { ...FINALE_LIGHT_END, duration: lightDur * 0.5, ease },
+    lightStart + lightDur * 0.45,
+  )
+
+  finalMoonSequence.to(
+    state,
+    { stars: 1, darkness: 1, videoDim: 0.38, duration: lightDur, ease },
+    lightStart,
+  )
+
+  // Luna se aleja en luminosidad — permanece atrás, oscura, sin desaparecer
+  finalMoonSequence.to(
+    state,
+    { moonVisible: 0.52, duration: dollyDur, ease },
+    dollyStart,
+  )
+  finalMoonSequence.to(
+    state,
+    { moonVisible: 0.18, duration: lightDur, ease },
+    lightStart,
+  )
+
+  const { message, cta, restart, shade, stars } = outroRefs ?? {}
+
+  if (shade?.current) {
+    finalMoonSequence.to(
+      shade.current,
+      { opacity: shadeMaxOpacity, duration: lightDur, ease },
+      lightStart,
+    )
+  }
+
+  if (stars?.current) {
+    finalMoonSequence.to(
+      stars.current,
+      { opacity: 0.9, duration: starsDur, ease },
+      starsStart,
+    )
+  }
+
+  if (message?.current) {
+    finalMoonSequence.to(
+      message.current,
+      { opacity: 1, y: 0, filter: 'blur(0px)', duration: messageDur, ease: 'power2.out' },
+      messageStart,
+    )
+  }
+
+  if (cta?.current) {
+    finalMoonSequence.to(
+      cta.current,
+      { opacity: 1, y: 0, duration: ctaDur, ease: 'power2.out' },
+      ctaStart,
+    )
+  }
+
+  if (restart?.current) {
+    finalMoonSequence.to(
+      restart.current,
+      { opacity: 1, y: 0, duration: restartDur, ease: 'power1.out' },
+      restartStart,
+    )
+  }
+
+  return finalMoonSequence
+}
+
+export function resetFinaleVisuals({ state, outroRefs, journeyFooterRef, cardRefs, pathRefs }) {
+  gsap.set(state, {
+    stars: 0,
+    darkness: 0,
+    videoDim: 1,
+    moonVisible: 1,
+    markersEnabled: true,
+    activeMarkerIndex: -1,
+    beaconOpacity: 0,
+    beaconYOffset: 0.14,
+    beaconScale: 0.55,
+    dragEnabled: true,
+    moonDrag: createMoonDragState(),
   })
+  gsap.set(state.lighting, { ...FINALE_LIGHT_START })
+
+  const { message, cta, restart, shade, stars } = outroRefs ?? {}
+
+  if (message?.current) {
+    gsap.set(message.current, { opacity: 0, y: 22, filter: 'blur(8px)' })
+  }
+  if (cta?.current) {
+    gsap.set(cta.current, { opacity: 0, y: 16 })
+  }
+  if (restart?.current) {
+    gsap.set(restart.current, { opacity: 0, y: 10 })
+  }
+  if (shade?.current) {
+    gsap.set(shade.current, { opacity: 0 })
+  }
+  if (stars?.current) {
+    gsap.set(stars.current, { opacity: 0 })
+  }
+  if (journeyFooterRef?.current) {
+    gsap.set(journeyFooterRef.current, { opacity: 1, pointerEvents: 'auto' })
+  }
+
+  if (cardRefs && pathRefs) {
+    hideAllMarkers(cardRefs, pathRefs)
+  }
 }
 
 /**
  * Timeline GSAP con dos capas:
  * 1) Cámara + luna (scrub continuo)
  * 2) Tarjetas (fade/blur en DOM, desacoplado)
+ * finalMoonSequence — timeline independiente, se reproduce al terminar el scroll
  */
 export function useCinematicTimeline({
   viewportRef,
   trackRef,
   cinematicStateRef,
   cardRefs,
+  pathRefs,
+  outroRefs,
+  journeyFooterRef,
   onChapterChange,
   onProgressChange,
+  freeScrollRef,
 }) {
   const timelineRef = useRef(null)
+  const finalSequenceRef = useRef(null)
 
   useEffect(() => {
-    const viewport = viewportRef.current
     const track = trackRef.current
     const state = cinematicStateRef.current
     if (!track || !state) return undefined
 
     const isMobile = window.matchMedia('(max-width: 768px)').matches
 
-    cardRefs.current.forEach(setCardHidden)
+    hideAllMarkers(cardRefs, pathRefs)
+
+    resetFinaleVisuals({
+      state,
+      outroRefs,
+      journeyFooterRef,
+      cardRefs,
+      pathRefs,
+    })
 
     let chapter = -1
     const reportChapter = (next) => {
@@ -62,9 +297,31 @@ export function useCinematicTimeline({
         trigger: track,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 2.6,
+        scrub: 3.4,
         invalidateOnRefresh: true,
+        snap: {
+          snapTo: (progress) => {
+            if (freeScrollRef?.current) return progress
+
+            let nearest = SCROLL_SNAP_POINTS[0]
+            let minDist = Infinity
+
+            for (const point of SCROLL_SNAP_POINTS) {
+              const dist = Math.abs(point - progress)
+              if (dist < minDist) {
+                minDist = dist
+                nearest = point
+              }
+            }
+
+            return nearest
+          },
+          duration: 0.65,
+          delay: 0.12,
+          ease: 'power2.inOut',
+        },
         onUpdate: (self) => {
+          state.scrollProgress = self.progress
           onProgressChange?.(self.progress)
           reportChapter(getActiveChapterFromProgress(self.progress))
         },
@@ -81,31 +338,19 @@ export function useCinematicTimeline({
     )
     tl.to(state.moon, { x: INTRO_SHOT.moon.x, y: INTRO_SHOT.moon.y, duration: introDur }, 0)
     tl.to(state, { fov: INTRO_SHOT.fov, duration: introDur }, 0)
+    tl.to(state.lighting, { ...FINALE_LIGHT_START, duration: introDur }, 0)
+    tl.to(state, { stars: 0, darkness: 0, videoDim: 1, duration: introDur }, 0)
 
     let cursor = introDur + CINEMATIC_TIMING.introGap
 
     moonShots.forEach((shot, index) => {
-      const cardEl = cardRefs.current[index]
-      const prevCard = index > 0 ? cardRefs.current[index - 1] : null
       const pullback = getPullbackForShot(shot, isMobile)
       const approachDur = CINEMATIC_TIMING.approachDur
       const holdDur = CINEMATIC_TIMING.holdDur
       const pullDur = CINEMATIC_TIMING.pullDur
-      const travelEase = 'power1.inOut'
-      const cardHide = {
-        opacity: 0,
-        filter: 'blur(12px)',
-        pointerEvents: 'none',
-      }
+      const travelEase = 'sine.inOut'
 
       if (index > 0) {
-        if (prevCard) {
-          tl.to(
-            prevCard,
-            { ...cardHide, duration: pullDur * 0.55, ease: 'power1.in' },
-            cursor,
-          )
-        }
         tl.to(
           state.camera,
           {
@@ -136,7 +381,7 @@ export function useCinematicTimeline({
         {
           x: shot.moon.x,
           y: shot.moon.y,
-          duration: approachDur + 0.12,
+          duration: approachDur,
           ease: travelEase,
         },
         cursor,
@@ -147,34 +392,9 @@ export function useCinematicTimeline({
         cursor,
       )
 
-      const cardIn = cursor + approachDur + CINEMATIC_TIMING.cardInOffset
-      if (cardEl) {
-        cardRefs.current.forEach((el, i) => {
-          if (el && i !== index) {
-            tl.set(el, cardHide, cardIn)
-          }
-        })
-        tl.to(
-          cardEl,
-          {
-            opacity: 1,
-            filter: 'blur(0px)',
-            pointerEvents: 'auto',
-            duration: 0.45,
-            ease: 'power2.out',
-          },
-          cardIn,
-        )
-      }
-
       cursor += approachDur + holdDur
 
-      if (index < moonShots.length - 1 && cardEl) {
-        tl.to(
-          cardEl,
-          { ...cardHide, duration: pullDur * 0.6, ease: 'power1.in' },
-          cursor,
-        )
+      if (index < moonShots.length - 1) {
         tl.to(
           state.camera,
           {
@@ -190,14 +410,36 @@ export function useCinematicTimeline({
       }
     })
 
+    const lastShot = moonShots[moonShots.length - 1]
+
+    finalSequenceRef.current = buildFinalMoonSequence({
+      state,
+      lastShot,
+      outroRefs,
+      journeyFooterRef,
+    })
+
     ScrollTrigger.refresh()
 
     return () => {
+      finalSequenceRef.current?.kill()
       tl.scrollTrigger?.kill()
       tl.kill()
       timelineRef.current = null
+      finalSequenceRef.current = null
     }
-  }, [viewportRef, trackRef, cinematicStateRef, cardRefs, onChapterChange, onProgressChange])
+  }, [
+    viewportRef,
+    trackRef,
+    cinematicStateRef,
+    cardRefs,
+    pathRefs,
+    outroRefs,
+    journeyFooterRef,
+    onChapterChange,
+    onProgressChange,
+    freeScrollRef,
+  ])
 
-  return timelineRef
+  return { timelineRef, finalSequenceRef }
 }

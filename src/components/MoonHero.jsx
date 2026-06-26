@@ -1,36 +1,316 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { Stars, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { createMoonDragState } from '../hooks/useCinematicTimeline'
+import { INTRO_SHOT, moonShots, getPullbackForShot } from '../data/moonShots'
+import { getCurrentSectionFromProgress } from '../data/cinematicTimeline'
+import AmbientSpaceEffects, { MoonLimbGlow } from './MoonAmbience.jsx'
 import './MoonHero.css'
 
 const MOON_URL = '/models/moon.glb'
 const CAMERA_SMOOTH = 0.055
 const MOON_SMOOTH = 0.05
+const MOON_DRAG_SMOOTH = 0.32
+const DRAG_RAD_PER_PX = 0.0029
+const MOON_MESH_SCALE = 1.72
+
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ')
+const _baseQuat = new THREE.Quaternion()
+const _targetQuat = new THREE.Quaternion()
+const _stepQuat = new THREE.Quaternion()
+const _axisY = new THREE.Vector3()
+const _axisX = new THREE.Vector3()
 
 useGLTF.preload(MOON_URL)
 
-function MoonModel() {
+function MoonModel({ acceptPointer = true }) {
   const { scene } = useGLTF(MOON_URL)
+  const rootRef = useRef()
 
-  const moon = useMemo(() => {
+  const { parts, scale, limbRadius } = useMemo(() => {
     const clone = scene.clone(true)
     const box = new THREE.Box3().setFromObject(clone)
     const center = box.getCenter(new THREE.Vector3())
     const size = box.getSize(new THREE.Vector3())
     const maxDim = Math.max(size.x, size.y, size.z)
+    const moonScale = MOON_MESH_SCALE / maxDim
 
     clone.position.sub(center)
-    clone.scale.setScalar(1.85 / maxDim)
 
-    return clone
+    const meshParts = []
+    let radius = MOON_MESH_SCALE * 0.5
+
+    clone.traverse((child) => {
+      if (!child.isMesh) return
+      child.geometry.computeBoundingSphere()
+      radius = child.geometry.boundingSphere.radius
+      meshParts.push({
+        geometry: child.geometry,
+        material: child.material,
+      })
+    })
+
+    return { parts: meshParts, scale: moonScale, limbRadius: radius }
   }, [scene])
 
-  return <primitive object={moon} />
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return undefined
+
+    const meshes = []
+    root.traverse((child) => {
+      if (child.isMesh) meshes.push(child)
+    })
+
+    if (acceptPointer) {
+      meshes.forEach((mesh) => {
+        delete mesh.raycast
+      })
+      return undefined
+    }
+
+    const skipRaycast = () => {}
+    meshes.forEach((mesh) => {
+      mesh.raycast = skipRaycast
+    })
+
+    return () => {
+      meshes.forEach((mesh) => {
+        delete mesh.raycast
+      })
+    }
+  }, [parts, acceptPointer])
+
+  return (
+    <group ref={rootRef} scale={scale}>
+      {parts.map((part, index) => (
+        <mesh key={index} geometry={part.geometry} material={part.material} />
+      ))}
+      <MoonLimbGlow radius={limbRadius} />
+    </group>
+  )
 }
 
-function CinematicMoonScene({ cinematicStateRef }) {
+const LIGHT_SMOOTH = 0.06
+
+function MoonDragTarget({ cinematicStateRef, dragEnabled }) {
+  const dragging = useRef(false)
+  const lastX = useRef(0)
+  const lastY = useRef(0)
+  const listenersRef = useRef(null)
+  const { camera } = useThree()
+
+  const canDrag = () => {
+    const state = cinematicStateRef.current
+    return dragEnabled && state?.dragEnabled
+  }
+
+  const applyDragDelta = (dx, dy) => {
+    const state = cinematicStateRef.current
+    if (!state) return
+    const drag = state.moonDrag
+    if (!drag.quaternion) drag.quaternion = new THREE.Quaternion()
+
+    // Rotación en espacio de pantalla (acumula en mundo, no en local)
+    _axisY.set(0, 1, 0)
+    _axisX.set(1, 0, 0).applyQuaternion(camera.quaternion).normalize()
+
+    _stepQuat.setFromAxisAngle(_axisY, dx * DRAG_RAD_PER_PX)
+    drag.quaternion.premultiply(_stepQuat)
+
+    _stepQuat.setFromAxisAngle(_axisX, dy * DRAG_RAD_PER_PX)
+    drag.quaternion.premultiply(_stepQuat)
+
+    drag.vx = 0
+    drag.vy = 0
+  }
+
+  const removeWindowListeners = () => {
+    const listeners = listenersRef.current
+    if (!listeners) return
+    window.removeEventListener('pointermove', listeners.onMove)
+    window.removeEventListener('pointerup', listeners.onUp)
+    window.removeEventListener('pointercancel', listeners.onUp)
+    listenersRef.current = null
+  }
+
+  const endDrag = () => {
+    dragging.current = false
+    const state = cinematicStateRef.current
+    if (state?.moonDrag) state.moonDrag.active = false
+    removeWindowListeners()
+    document.body.style.cursor = canDrag() ? 'grab' : ''
+  }
+
+  useEffect(
+    () => () => {
+      endDrag()
+      document.body.style.cursor = ''
+    },
+    [],
+  )
+
+  const onPointerDown = (event) => {
+    if (!canDrag() || event.button !== 0) return
+    event.stopPropagation()
+
+    endDrag()
+    dragging.current = true
+    const state = cinematicStateRef.current
+    if (state?.moonDrag) state.moonDrag.active = true
+    lastX.current = event.clientX
+    lastY.current = event.clientY
+    document.body.style.cursor = 'grabbing'
+
+    const onMove = (moveEvent) => {
+      if (!dragging.current) return
+      if (moveEvent.buttons !== 1) {
+        endDrag()
+        return
+      }
+
+      const dx = moveEvent.clientX - lastX.current
+      const dy = moveEvent.clientY - lastY.current
+      lastX.current = moveEvent.clientX
+      lastY.current = moveEvent.clientY
+
+      if (dx !== 0 || dy !== 0) applyDragDelta(dx, dy)
+    }
+
+    const onUp = () => endDrag()
+
+    listenersRef.current = { onMove, onUp }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }
+
+  if (!dragEnabled) return null
+
+  return (
+    <mesh
+      onPointerDown={onPointerDown}
+      onPointerOver={() => {
+        if (canDrag() && !dragging.current) document.body.style.cursor = 'grab'
+      }}
+      onPointerOut={() => {
+        if (!dragging.current) document.body.style.cursor = ''
+      }}
+    >
+      <sphereGeometry args={[0.985, 48, 48]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  )
+}
+
+function CinematicLights({ cinematicStateRef, sunRef, fillRef, rimRef, ambientRef }) {
+  useFrame(() => {
+    const lighting = cinematicStateRef?.current?.lighting
+    if (!lighting) return
+
+    if (sunRef.current) {
+      sunRef.current.position.x = THREE.MathUtils.lerp(
+        sunRef.current.position.x,
+        lighting.sunX,
+        LIGHT_SMOOTH,
+      )
+      sunRef.current.position.y = THREE.MathUtils.lerp(
+        sunRef.current.position.y,
+        lighting.sunY,
+        LIGHT_SMOOTH,
+      )
+      sunRef.current.position.z = THREE.MathUtils.lerp(
+        sunRef.current.position.z,
+        lighting.sunZ,
+        LIGHT_SMOOTH,
+      )
+      sunRef.current.intensity = THREE.MathUtils.lerp(
+        sunRef.current.intensity,
+        lighting.sunIntensity,
+        LIGHT_SMOOTH,
+      )
+    }
+
+    if (fillRef.current) {
+      fillRef.current.position.set(lighting.fillX, lighting.fillY, lighting.fillZ)
+      fillRef.current.intensity = THREE.MathUtils.lerp(
+        fillRef.current.intensity,
+        lighting.fillIntensity,
+        LIGHT_SMOOTH,
+      )
+    }
+
+    if (rimRef.current) {
+      rimRef.current.position.set(lighting.rimX, lighting.rimY, lighting.rimZ)
+      rimRef.current.intensity = THREE.MathUtils.lerp(
+        rimRef.current.intensity,
+        lighting.rimIntensity,
+        LIGHT_SMOOTH,
+      )
+    }
+
+    if (ambientRef.current) {
+      ambientRef.current.intensity = THREE.MathUtils.lerp(
+        ambientRef.current.intensity,
+        lighting.ambient,
+        LIGHT_SMOOTH,
+      )
+    }
+  })
+
+  return (
+    <>
+      <ambientLight ref={ambientRef} intensity={0.42} />
+      <directionalLight
+        ref={sunRef}
+        position={[4, 2, 5]}
+        intensity={1.55}
+        color="#fff8ee"
+      />
+      <directionalLight
+        ref={fillRef}
+        position={[-3, -1, -2]}
+        intensity={0.22}
+        color="#8eb4ff"
+      />
+      <directionalLight ref={rimRef} position={[-1.2, 0.4, -3.5]} intensity={0.18} color="#c8d8ff" />
+    </>
+  )
+}
+
+function StarField({ cinematicStateRef }) {
+  const starsRef = useRef()
+
+  useFrame(() => {
+    const opacity = cinematicStateRef?.current?.stars ?? 0
+    const material = starsRef.current?.material
+    if (!material) return
+
+    material.opacity = opacity
+    starsRef.current.visible = opacity > 0.02
+  })
+
+  return (
+    <Stars
+      ref={starsRef}
+      radius={90}
+      depth={55}
+      count={2800}
+      factor={3.8}
+      saturation={0}
+      fade
+      speed={0.15}
+    />
+  )
+}
+
+function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
   const moonRef = useRef()
+  const sunRef = useRef()
+  const fillRef = useRef()
+  const rimRef = useRef()
+  const ambientRef = useRef()
   const lookAt = useMemo(() => new THREE.Vector3(), [])
   const { camera } = useThree()
 
@@ -63,36 +343,87 @@ function CinematicMoonScene({ cinematicStateRef }) {
       camera.updateProjectionMatrix()
     }
 
+    const journeySection = getCurrentSectionFromProgress(state.scrollProgress ?? 0)
+    if (journeySection >= 0 && moonShots[journeySection]) {
+      const isMobile = window.matchMedia('(max-width: 768px)').matches
+      const startZ =
+        journeySection === 0
+          ? INTRO_SHOT.camera.z
+          : getPullbackForShot(moonShots[journeySection], isMobile).z
+      const endZ = moonShots[journeySection].camera.z
+      const span = startZ - endZ
+      state.visualApproachT =
+        span > 0.01
+          ? THREE.MathUtils.clamp((startZ - camera.position.z) / span, 0, 1)
+          : 1
+      state.cameraSettleZDelta = Math.abs(camera.position.z - state.camera.z)
+      state.cameraSettleYDelta = Math.abs(camera.position.y - state.camera.y)
+    } else {
+      state.visualApproachT = 0
+      state.cameraSettleZDelta = Infinity
+      state.cameraSettleYDelta = Infinity
+    }
+
     if (moonRef.current) {
-      moonRef.current.rotation.y = THREE.MathUtils.lerp(
-        moonRef.current.rotation.y,
-        state.moon.y,
-        MOON_SMOOTH,
-      )
-      moonRef.current.rotation.x = THREE.MathUtils.lerp(
-        moonRef.current.rotation.x,
-        state.moon.x,
-        MOON_SMOOTH,
-      )
+      if (state.moonHold) {
+        state.moon.x = state.moonHold.x
+        state.moon.y = state.moonHold.y
+      }
+
+      const drag = state.moonDrag ?? createMoonDragState()
+      const moonX = state.moonHold?.x ?? state.moon.x
+      const moonY = state.moonHold?.y ?? state.moon.y
+      _euler.set(moonX, moonY, 0)
+      _baseQuat.setFromEuler(_euler)
+      _targetQuat.copy(_baseQuat)
+      if (drag.quaternion && state.dragEnabled && moonDragEnabled) {
+        _targetQuat.premultiply(drag.quaternion)
+      }
+
+      const smooth =
+        state.dragEnabled && moonDragEnabled
+          ? MOON_DRAG_SMOOTH
+          : MOON_SMOOTH
+
+      moonRef.current.quaternion.slerp(_targetQuat, smooth)
+
+      if (journeySection >= 0 && moonShots[journeySection] && !state.moonHold) {
+        const targetMoon = moonShots[journeySection].moon
+        _euler.set(targetMoon.x, targetMoon.y, 0)
+        _stepQuat.setFromEuler(_euler)
+        state.moonSettleAngle = moonRef.current.quaternion.angleTo(_stepQuat)
+      } else if (state.moonHold) {
+        state.moonSettleAngle = moonRef.current.quaternion.angleTo(_targetQuat)
+      }
     }
   })
 
   return (
     <>
-      <ambientLight intensity={0.42} />
-      <directionalLight position={[4, 2, 5]} intensity={1.55} color="#fff8ee" />
-      <directionalLight position={[-3, -1, -2]} intensity={0.22} color="#8eb4ff" />
-      <pointLight position={[0, 0, 2]} intensity={0.3} color="#ffffff" />
+      <CinematicLights
+        cinematicStateRef={cinematicStateRef}
+        sunRef={sunRef}
+        fillRef={fillRef}
+        rimRef={rimRef}
+        ambientRef={ambientRef}
+      />
+      <StarField cinematicStateRef={cinematicStateRef} />
+      <AmbientSpaceEffects />
       <group ref={moonRef}>
         <Suspense fallback={null}>
-          <MoonModel />
+          <MoonModel acceptPointer={!moonDragEnabled} />
         </Suspense>
+        <MoonDragTarget cinematicStateRef={cinematicStateRef} dragEnabled={moonDragEnabled} />
       </group>
     </>
   )
 }
 
-export default function MoonHero({ visible = true, cinematicStateRef }) {
+export default function MoonHero({
+  visible = true,
+  cinematicStateRef,
+  moonDragEnabled = false,
+}) {
   const [dprMax, setDprMax] = useState(1.75)
 
   useEffect(() => {
@@ -104,17 +435,23 @@ export default function MoonHero({ visible = true, cinematicStateRef }) {
   }, [])
 
   return (
-    <div className={`moon-hero ${visible ? 'is-visible' : ''}`}>
+    <div
+      className={`moon-hero ${visible ? 'is-visible' : ''} ${moonDragEnabled ? 'is-draggable' : ''}`}
+    >
+      <div className="moon-hero__flare" aria-hidden="true" />
       <Canvas
         className="moon-hero__canvas"
         camera={{
-          position: [0, 0.06, 5.68],
-          fov: 35,
+          position: [0, 0.06, 6.08],
+          fov: 34,
         }}
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, dprMax]}
       >
-        <CinematicMoonScene cinematicStateRef={cinematicStateRef} />
+        <CinematicMoonScene
+          cinematicStateRef={cinematicStateRef}
+          moonDragEnabled={moonDragEnabled}
+        />
       </Canvas>
     </div>
   )

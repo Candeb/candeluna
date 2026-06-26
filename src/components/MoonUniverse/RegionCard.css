@@ -1,38 +1,41 @@
 .region-card {
-  position: fixed;
-  top: 50%;
-  z-index: 6;
-  width: min(340px, 36vw);
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 22px 22px 18px;
   box-sizing: border-box;
   text-decoration: none;
   text-align: left;
-  color: rgba(235, 238, 245, 0.9);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(58, 62, 72, 0.42);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transform: translateY(-50%);
-  filter: blur(14px);
+  color: rgba(245, 240, 255, 0.94);
+  border-radius: 14px;
+  border: 1px solid rgba(168, 120, 255, 0.38);
+  background: rgba(48, 24, 78, 0.52);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, 0.42),
+    0 0 28px rgba(124, 58, 237, 0.14);
+  overflow: hidden;
+}
+
+.region-card.is-locked {
   pointer-events: none;
-  will-change: opacity, filter;
+  cursor: default;
+  user-select: none;
 }
 
-.region-card--left {
-  left: clamp(20px, 5vw, 72px);
+.region-card.is-interactive {
+  cursor: pointer;
 }
 
-.region-card--right {
-  right: clamp(20px, 5vw, 72px);
-}
-
-.region-card:hover,
-.region-card:focus-visible {
-  border-color: rgba(255, 255, 255, 0.32);
-  background: rgba(72, 76, 88, 0.58);
+.region-card.is-interactive:hover,
+.region-card.is-interactive:focus-visible {
+  border-color: rgba(196, 155, 255, 0.62);
+  background: rgba(62, 32, 98, 0.66);
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.48),
+    0 0 36px rgba(124, 58, 237, 0.22);
   outline: none;
 }
 
@@ -42,7 +45,17 @@
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.16em;
-  color: rgba(200, 210, 225, 0.55);
+  color: rgba(210, 185, 255, 0.58);
+}
+
+.region-card__region {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(196, 170, 240, 0.5);
 }
 
 .region-card__tag {
@@ -52,7 +65,7 @@
   font-size: 8px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(180, 190, 210, 0.48);
+  color: rgba(186, 160, 235, 0.55);
 }
 
 .region-card__title {
@@ -63,87 +76,90 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(248, 250, 252, 0.95);
+  overflow-wrap: anywhere;
 }
 
 .region-card__summary {
   margin: 0 0 14px;
   font-size: 11px;
   line-height: 1.55;
-  color: rgba(210, 216, 228, 0.62);
+  color: rgba(210, 216, 228, 0.72);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .region-card__cta {
+  display: inline-block;
+  margin-top: 2px;
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(190, 200, 220, 0.5);
+  color: rgba(168, 130, 255, 0.72);
 }
 
 @media (max-width: 900px) and (min-width: 769px) {
   .region-card {
-    width: min(300px, 40vw);
     padding: 18px;
   }
 }
 
 @media (max-width: 768px) {
   .region-card {
-    top: 46%;
-    bottom: auto;
-    left: 50% !important;
-    right: auto !important;
-    width: min(100%, calc(100vw - 32px - var(--safe-left) - var(--safe-right)));
-    max-width: 360px;
-    padding: 16px 18px 14px;
-    transform: translate(-50%, -50%);
-    border-radius: 14px;
-    z-index: 7;
+    padding: 14px 16px 12px;
+    border-radius: 12px;
     box-shadow:
-      0 20px 56px rgba(0, 0, 0, 0.45),
-      0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+      0 16px 40px rgba(0, 0, 0, 0.42),
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
   }
 
   .region-card__index {
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     font-size: 9px;
   }
 
+  .region-card__region,
+  .region-card__tag {
+    font-size: 7px;
+  }
+
   .region-card__title {
-    font-size: 14px;
-    margin-bottom: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+    letter-spacing: 0.03em;
   }
 
   .region-card__summary {
-    font-size: 10.5px;
-    margin-bottom: 10px;
+    font-size: 10px;
+    line-height: 1.45;
+    margin-bottom: 8px;
     -webkit-line-clamp: 2;
+  }
+
+  .region-card__cta {
+    font-size: 7px;
   }
 }
 
 @media (max-width: 480px) {
   .region-card {
-    top: 44%;
-    width: min(100%, calc(100vw - 24px - var(--safe-left) - var(--safe-right)));
-    padding: 14px 16px 12px;
+    padding: 12px 14px 10px;
   }
 
   .region-card__title {
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  .region-card__summary {
+    font-size: 9.5px;
+    -webkit-line-clamp: 2;
   }
 }
 
 @media (max-width: 768px) and (orientation: landscape) {
-  .region-card {
-    top: 50%;
-    width: min(340px, calc(48vw - var(--safe-left) - var(--safe-right)));
-    max-width: 340px;
-  }
-
   .region-card__summary {
     -webkit-line-clamp: 2;
     margin-bottom: 8px;

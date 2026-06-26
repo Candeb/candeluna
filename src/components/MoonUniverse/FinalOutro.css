@@ -1,0 +1,150 @@
+.final-outro {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 4.5vh, 40px);
+  padding: clamp(20px, 5vw, 48px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.cinematic__viewport.is-finale .final-outro {
+  z-index: 14;
+}
+
+.final-outro__message {
+  max-width: min(520px, 90vw);
+  pointer-events: none;
+}
+
+.final-outro__line {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(20px, 3.6vw, 32px);
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  font-weight: 300;
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.65);
+}
+
+.final-outro__line + .final-outro__line {
+  margin-top: 0.45em;
+}
+
+.final-outro__line--accent {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 400;
+}
+
+.final-outro__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.final-outro__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+  pointer-events: auto;
+}
+
+.final-outro__btn--primary {
+  color: #0a0c12;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.94);
+}
+
+.final-outro__btn--primary:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.final-outro__btn--ghost {
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+}
+
+.final-outro__btn--ghost:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.final-outro__restart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: clamp(8px, 2vh, 20px);
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.25s ease;
+  pointer-events: auto;
+}
+
+.final-outro__restart:hover {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.final-outro__restart-icon {
+  font-size: 14px;
+  line-height: 1;
+  animation: final-outro-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes final-outro-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(4px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .final-outro {
+    justify-content: center;
+    padding-top: 12vh;
+  }
+
+  .final-outro__line {
+    font-size: clamp(18px, 5.2vw, 24px);
+  }
+
+  .final-outro__actions {
+    flex-direction: column;
+    width: min(320px, 88vw);
+  }
+
+  .final-outro__btn {
+    width: 100%;
+  }
+}

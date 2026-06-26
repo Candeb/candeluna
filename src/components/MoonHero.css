@@ -25,6 +25,48 @@
   height: 100%;
   display: block;
   overflow: visible;
+  pointer-events: none;
+}
+
+.moon-hero.is-beacon .moon-hero__canvas {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.moon-hero.is-draggable .moon-hero__canvas {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.moon-hero__flare {
+  position: absolute;
+  top: 22%;
+  right: 18%;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 248, 230, 0.14) 0%,
+    rgba(255, 240, 210, 0.06) 35%,
+    transparent 68%
+  );
+  filter: blur(8px);
+  opacity: 0.55;
+  animation: moon-flare-breathe 6s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes moon-flare-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.05);
+  }
 }
 
 .moon-hero__hint {

@@ -1,0 +1,112 @@
+.region-chapter {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.region-chapter.is-active {
+  z-index: 3;
+}
+
+.region-card-shell {
+  position: absolute;
+  z-index: 2;
+  width: min(340px, 36vw);
+  max-width: calc(100vw - 40px);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.region-card-reveal {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+  z-index: 3;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.region-connector {
+  z-index: 1;
+}
+
+.region-chapter--left .region-card-shell {
+  left: clamp(20px, 5vw, 72px);
+  right: auto;
+}
+
+.region-chapter--right .region-card-shell {
+  right: clamp(20px, 5vw, 72px);
+  left: auto;
+}
+
+.region-chapter--place-high .region-card-shell {
+  top: 26%;
+  transform: translateY(-50%);
+}
+
+.region-chapter--place-mid .region-card-shell {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.region-chapter--place-low .region-card-shell {
+  top: 72%;
+  transform: translateY(-50%);
+}
+
+.region-chapter--place-edge .region-card-shell {
+  top: 18%;
+  transform: translateY(-50%);
+}
+
+.region-chapter--place-edge.region-chapter--left .region-card-shell {
+  left: clamp(12px, 3.5vw, 48px);
+}
+
+.region-chapter--place-edge.region-chapter--right .region-card-shell {
+  right: clamp(12px, 3.5vw, 48px);
+}
+
+@media (max-width: 768px) {
+  .region-card-shell {
+    width: min(292px, calc(100vw - 40px - var(--safe-left, 0px) - var(--safe-right, 0px)));
+    max-width: 320px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: max(104px, calc(13vh + var(--safe-bottom, 0px)));
+    transform: translateX(-50%);
+  }
+
+  .region-chapter--left .region-card-shell,
+  .region-chapter--right .region-card-shell,
+  .region-chapter--place-high .region-card-shell,
+  .region-chapter--place-mid .region-card-shell,
+  .region-chapter--place-low .region-card-shell,
+  .region-chapter--place-edge .region-card-shell {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: max(104px, calc(13vh + var(--safe-bottom, 0px)));
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 480px) {
+  .region-card-shell {
+    width: min(272px, calc(100vw - 32px - var(--safe-left, 0px) - var(--safe-right, 0px)));
+    bottom: max(96px, calc(12vh + var(--safe-bottom, 0px)));
+  }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .region-card-shell {
+    width: min(260px, 42vw);
+    bottom: max(72px, 10vh);
+  }
+}

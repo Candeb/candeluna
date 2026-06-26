@@ -10,7 +10,16 @@ function LenisScrollBridge() {
   const lenis = useLenis()
 
   useEffect(() => {
+    if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+      history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
+
+  useEffect(() => {
     if (!lenis) return undefined
+
+    lenis.scrollTo(0, { immediate: true })
 
     const root = document.documentElement
 

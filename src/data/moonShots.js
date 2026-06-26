@@ -1,11 +1,12 @@
 import { services } from './services'
+import { MOON_REGIONS } from './moonRegions'
 
 /** Estado inicial: cámara alejada, luna completa (z mayor = luna más pequeña) */
 export const INTRO_SHOT = {
-  camera: { x: 0, y: 0.06, z: 5.68 },
+  camera: { x: 0, y: 0.06, z: 6.08 },
   target: { x: 0, y: 0, z: 0 },
   moon: { x: 0.04, y: 0 },
-  fov: 35,
+  fov: 34,
 }
 
 export function getPullbackForShot(shot, isMobile) {
@@ -13,24 +14,25 @@ export function getPullbackForShot(shot, isMobile) {
   return shot.pullbackMobile ?? shot.pullback
 }
 
-/** Cámara centrada; zoom cercano original. Rotación lunar por región. */
+/** Cámara centrada; cada región apunta a una zona distinta de la luna. */
 export const moonShots = services.map((service, index) => {
-  const phase = index / Math.max(1, services.length - 1)
+  const profile = MOON_REGIONS[service.slug]
+  const cardSide = profile.cardSide ?? (index % 2 === 0 ? 'right' : 'left')
+  const cardPlacement = profile.cardPlacement ?? 'mid'
 
   return {
     id: service.slug,
     service,
-    camera: {
-      x: 0,
-      y: 0.02 + phase * 0.08,
-      z: 2.05 + (index % 2) * 0.14,
-    },
+    region: profile.region,
+    regionLabel: profile.label,
+    camera: { ...profile.camera },
     target: { x: 0, y: 0, z: 0 },
-    moon: {
-      x: 0.1 + (index % 2) * 0.07,
-      y: -0.55 + phase * Math.PI * 1.35,
-    },
-    fov: 31 + (index % 2) * 2,
+    moon: { ...profile.moon },
+    contemplateRotate: profile.contemplateRotate,
+    hotspot: profile.hotspot,
+    anchor: profile.anchor,
+    connector: profile.connector,
+    fov: profile.fov,
     pullback: {
       x: 0,
       y: 0.05,
@@ -41,9 +43,10 @@ export const moonShots = services.map((service, index) => {
       y: 0.05,
       z: 4.55,
     },
-    cardSide: index % 2 === 0 ? 'right' : 'left',
+    cardSide,
+    cardPlacement,
   }
 })
 
-export const SCROLL_CHAPTER_VH = 125
+export const SCROLL_CHAPTER_VH = 220
 export const SCROLL_HEIGHT_VH = (1 + services.length) * SCROLL_CHAPTER_VH

@@ -12,6 +12,10 @@
   pointer-events: none;
 }
 
+.cinematic__viewport:not(.is-finale) .final-outro__actions {
+  pointer-events: none;
+}
+
 .cinematic__viewport.is-finale .final-outro {
   z-index: 14;
 }
@@ -48,6 +52,10 @@
   pointer-events: none;
 }
 
+.final-outro__actions.is-interactive {
+  pointer-events: auto;
+}
+
 .final-outro__btn {
   display: inline-flex;
   align-items: center;
@@ -62,7 +70,13 @@
     background 0.25s ease,
     border-color 0.25s ease,
     transform 0.25s ease;
+  pointer-events: none;
+  cursor: default;
+}
+
+.final-outro__actions.is-interactive .final-outro__btn {
   pointer-events: auto;
+  cursor: pointer;
 }
 
 .final-outro__btn--primary {
@@ -102,8 +116,13 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  cursor: pointer;
+  cursor: default;
   transition: color 0.25s ease;
+  pointer-events: none;
+}
+
+.final-outro__restart.is-interactive {
+  cursor: pointer;
   pointer-events: auto;
 }
 

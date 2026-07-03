@@ -13,13 +13,33 @@ export const CINEMATIC_TIMING = {
   cardInOffset: 0.1,
   /** Scroll: fin del approach (inicio del hold) antes de revelar marcador */
   markerEmergeFraction: 1,
-  /** Cámara visual: fracción mínima del zoom completado (casi 1 = aterrizaje) */
-  markerVisualMinT: 0.994,
+  /** Cámara visual: fracción mínima del zoom completado (1 = pico de zoom) */
+  markerVisualMinT: 0.997,
   /** Tolerancia máx. entre cámara visual y objetivo GSAP (unidades mundo) */
   markerCameraSettleMaxZ: 0.022,
   markerCameraSettleMaxY: 0.016,
   /** Rotación lunar máx. (rad) para revelar marcador */
   markerMoonSettleMaxAngle: 0.045,
+}
+
+/** Umbrales de revelación en móvil — esperar aterrizaje visual antes de marcador */
+export const MOBILE_MARKER_REVEAL = {
+  markerVisualMinT: 0.995,
+  markerCameraSettleMaxZ: 0.03,
+  markerCameraSettleMaxY: 0.018,
+  markerMoonSettleMaxAngle: 0.05,
+}
+
+export function getMarkerRevealConfig(isMobile) {
+  if (!isMobile) {
+    return {
+      markerVisualMinT: CINEMATIC_TIMING.markerVisualMinT,
+      markerCameraSettleMaxZ: CINEMATIC_TIMING.markerCameraSettleMaxZ,
+      markerCameraSettleMaxY: CINEMATIC_TIMING.markerCameraSettleMaxY,
+      markerMoonSettleMaxAngle: CINEMATIC_TIMING.markerMoonSettleMaxAngle,
+    }
+  }
+  return MOBILE_MARKER_REVEAL
 }
 
 function buildTimelineMarkers() {
@@ -139,7 +159,8 @@ export function getMarkerTargetFromProgress(scrollProgress, cinematicState = nul
     markerVisualMinT,
     markerCameraSettleMaxZ,
     markerCameraSettleMaxY,
-  } = CINEMATIC_TIMING
+    markerMoonSettleMaxAngle,
+  } = getMarkerRevealConfig(Boolean(cinematicState.isMobile))
 
   const visualT = cinematicState.visualApproachT ?? 0
   if (visualT < markerVisualMinT) return -1
@@ -148,8 +169,10 @@ export function getMarkerTargetFromProgress(scrollProgress, cinematicState = nul
   const yLag = cinematicState.cameraSettleYDelta ?? Infinity
   if (zLag > markerCameraSettleMaxZ || yLag > markerCameraSettleMaxY) return -1
 
-  const moonAngle = cinematicState.moonSettleAngle ?? Infinity
-  if (moonAngle > CINEMATIC_TIMING.markerMoonSettleMaxAngle) return -1
+  if (!cinematicState.moonUserLocked || section > 0) {
+    const moonAngle = cinematicState.moonSettleAngle ?? Infinity
+    if (moonAngle > markerMoonSettleMaxAngle) return -1
+  }
 
   return section
 }

@@ -12,7 +12,7 @@ const RegionChapter = forwardRef(function RegionChapter(
   return (
     <div
       ref={ref}
-      className={`region-chapter region-chapter--${side} region-chapter--place-${placement} ${isActive ? 'is-active' : ''}`}
+      className={`region-chapter region-chapter--${side} region-chapter--place-${placement} ${isActive ? 'is-active' : ''} ${cardInteractive ? 'is-navigable' : ''}`}
     >
       <RegionConnector ref={connectorRef} side={side} placement={placement} />
       <div className="region-card-shell">

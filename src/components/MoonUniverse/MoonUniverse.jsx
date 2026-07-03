@@ -6,6 +6,7 @@ import { moonShots, SCROLL_HEIGHT_VH } from '../../data/moonShots'
 import { getHeaderOpacity } from '../../data/cinematicTimeline'
 import {
   createCinematicState,
+  resetJourneyToStart,
   useCinematicTimeline,
 } from '../../hooks/useCinematicTimeline'
 import { useFinaleAutoplay } from '../../hooks/useFinaleAutoplay'
@@ -26,6 +27,7 @@ export default function MoonUniverse() {
   const pathRefs = useRef([])
   const freeScrollRef = useRef(false)
   const scrollLockRef = useRef(false)
+  const journeyRestartingRef = useRef(false)
   const journeyFooterRef = useRef(null)
   const lenis = useLenis()
 
@@ -49,6 +51,8 @@ export default function MoonUniverse() {
   const [scrollProgress, setScrollProgress] = useState(0)
   const [finaleActive, setFinaleActive] = useState(false)
   const [finaleComplete, setFinaleComplete] = useState(false)
+  const [ctaRevealed, setCtaRevealed] = useState(false)
+  const [restartRevealed, setRestartRevealed] = useState(false)
 
   const handleChapterChange = useCallback((chapter) => {
     setActiveChapter(chapter)
@@ -60,11 +64,21 @@ export default function MoonUniverse() {
 
   const handleFinaleStart = useCallback(() => {
     setFinaleActive(true)
+    setCtaRevealed(false)
+    setRestartRevealed(false)
   }, [])
 
   const handleFinaleComplete = useCallback(() => {
     setFinaleActive(true)
     setFinaleComplete(true)
+  }, [])
+
+  const handleCtaReveal = useCallback(() => {
+    setCtaRevealed(true)
+  }, [])
+
+  const handleRestartReveal = useCallback(() => {
+    setRestartRevealed(true)
   }, [])
 
   const { timelineRef, finalSequenceRef } = useCinematicTimeline({
@@ -78,6 +92,8 @@ export default function MoonUniverse() {
     onChapterChange: handleChapterChange,
     onProgressChange: handleProgressChange,
     freeScrollRef,
+    onCtaReveal: handleCtaReveal,
+    onRestartReveal: handleRestartReveal,
   })
 
   const {
@@ -90,6 +106,7 @@ export default function MoonUniverse() {
     hideForFinale,
   } = useMarkers({
     lenis,
+    scrollTimelineRef: timelineRef,
     cinematicStateRef,
     cardRefs,
     pathRefs,
@@ -111,6 +128,7 @@ export default function MoonUniverse() {
     scrollProgress,
     freeScrollRef,
     scrollLockRef,
+    journeyRestartingRef,
     onFinaleStart: () => {
       hideForFinale()
       handleFinaleStart()
@@ -144,21 +162,50 @@ export default function MoonUniverse() {
   const restartJourney = useCallback(() => {
     if (!lenis) return
 
+    journeyRestartingRef.current = true
+
     resetFinale()
     resetMarkers()
+    resetJourneyToStart({
+      state: cinematicStateRef.current,
+      timelineRef,
+      outroRefs: outroRefs.current,
+      journeyFooterRef,
+      cardRefs,
+      pathRefs,
+      onProgressChange: handleProgressChange,
+      onChapterChange: handleChapterChange,
+    })
+
     setFinaleActive(false)
     setFinaleComplete(false)
+    setCtaRevealed(false)
+    setRestartRevealed(false)
+    setScrollProgress(0)
+    setActiveChapter(-1)
+
     document.documentElement.style.setProperty('--finale-video-dim', '1')
+    document.documentElement.style.removeProperty('--moon-backdrop-opacity')
 
     freeScrollRef.current = true
     scrollLockRef.current = false
-    lenis.scrollTo(0, {
-      duration: 2.4,
-      onComplete: () => {
-        freeScrollRef.current = false
-      },
+    lenis.start()
+    window.scrollTo(0, 0)
+    lenis.scrollTo(0, { immediate: true })
+
+    requestAnimationFrame(() => {
+      ScrollTrigger.refresh()
+      freeScrollRef.current = false
+      journeyRestartingRef.current = false
     })
-  }, [lenis, resetFinale, resetMarkers])
+  }, [
+    lenis,
+    timelineRef,
+    resetFinale,
+    resetMarkers,
+    handleProgressChange,
+    handleChapterChange,
+  ])
 
   useEffect(() => {
     if (!lenis) return undefined
@@ -257,11 +304,17 @@ export default function MoonUniverse() {
       phase === MARKER_PHASE.CARD ||
       phase === MARKER_PHASE.EXITING)
 
+  const isCardNavigable =
+    !finaleActive &&
+    phase === MARKER_PHASE.CARD &&
+    cardReady &&
+    activeIndex >= 0
+
   return (
     <div className="cinematic">
       <div
         ref={viewportRef}
-        className={`cinematic__viewport ${isExploring ? 'is-exploring' : ''} ${isMarkerFlow ? 'is-marker-flow' : ''} ${finaleActive ? 'is-finale' : ''} ${finaleComplete ? 'is-finale-complete' : ''} ${isMoonDrag ? 'is-moon-drag' : ''}`}
+        className={`cinematic__viewport ${isExploring ? 'is-exploring' : ''} ${isMarkerFlow ? 'is-marker-flow' : ''} ${isCardNavigable ? 'is-card-navigable' : ''} ${finaleActive ? 'is-finale' : ''} ${finaleComplete ? 'is-finale-complete' : ''} ${isMoonDrag ? 'is-moon-drag' : ''}`}
       >
         <div className="cinematic__vignette" aria-hidden="true" />
         <div ref={finaleShadeRef} className="cinematic__finale-shade" aria-hidden="true" />
@@ -275,9 +328,9 @@ export default function MoonUniverse() {
             pointerEvents: headerOpacity < 0.15 ? 'none' : 'auto',
           }}
         >
-          <h1 className={titleVisible ? 'is-visible' : ''}>
-            Hola, Soy Candela Bustos
-          </h1>
+          <h2 className={titleVisible ? 'is-visible' : ''}>
+          Desarrollo productos digitales que conectan ideas, personas y sistemas.
+          </h2>
           <p className={`cinematic__tagline ${taglineVisible ? 'is-visible' : ''}`}>
             Explorá el universo de soluciones
           </p>
@@ -335,6 +388,8 @@ export default function MoonUniverse() {
           ctaRef={outroCtaRef}
           restartRef={outroRestartRef}
           onRestart={restartJourney}
+          ctaInteractive={ctaRevealed}
+          restartInteractive={restartRevealed}
           aria-hidden={!finaleActive}
         />
 

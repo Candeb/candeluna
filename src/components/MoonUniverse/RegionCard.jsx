@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import './RegionCard.css'
 
 function RegionCardContent({ service, index, side, regionLabel }) {
@@ -23,29 +23,38 @@ const RegionCard = forwardRef(function RegionCard(
   { service, index, side = 'right', regionLabel, isInteractive = false },
   ref,
 ) {
+  const navigate = useNavigate()
   const className = `region-card region-card--${side} ${
     isInteractive ? 'is-interactive' : 'is-locked'
   }`
 
-  if (!isInteractive) {
-    return (
-      <div ref={ref} className={className} aria-hidden="true">
-        <RegionCardContent
-          service={service}
-          index={index}
-          side={side}
-          regionLabel={regionLabel}
-        />
-      </div>
-    )
+  const goToService = () => {
+    if (!isInteractive) return
+    navigate(`/servicios/${service.slug}`)
   }
 
   return (
-    <Link
+    <div
       ref={ref}
-      to={`/servicios/${service.slug}`}
       className={className}
-      tabIndex={0}
+      aria-hidden={!isInteractive}
+      role={isInteractive ? 'link' : undefined}
+      tabIndex={isInteractive ? 0 : -1}
+      onClick={(event) => {
+        if (!isInteractive) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
+        goToService()
+      }}
+      onKeyDown={(event) => {
+        if (!isInteractive) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          goToService()
+        }
+      }}
     >
       <RegionCardContent
         service={service}
@@ -53,7 +62,7 @@ const RegionCard = forwardRef(function RegionCard(
         side={side}
         regionLabel={regionLabel}
       />
-    </Link>
+    </div>
   )
 })
 

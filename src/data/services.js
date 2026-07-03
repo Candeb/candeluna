@@ -1,21 +1,21 @@
 export const services = [
   {
     slug: 'landing-pages',
-    title: 'Landing Pages',
+    title: 'Presencia digital',
     tag: 'Captar',
     summary:
       'Páginas enfocadas en conversión, con narrativa clara y diseño que convierte visitas en oportunidades.',
   },
   {
     slug: 'automatizacion',
-    title: 'Automatización',
+    title: 'Procesos inteligentes',
     tag: 'Optimizar',
     summary:
       'Flujos inteligentes que eliminan tareas repetitivas y liberan tiempo para lo que importa.',
   },
   {
     slug: 'integracion-apis',
-    title: 'Integración de APIs',
+    title: 'Integraciones',
     tag: 'Conectar',
     summary:
       'Sistemas que hablan entre sí: datos sincronizados, menos fricción y procesos unificados.',
@@ -27,6 +27,7 @@ export const services = [
     summary:
       'Soluciones web hechas para tu negocio, desde la idea hasta un producto escalable.',
   },
+  
   {
     slug: 'contacto',
     title: 'Contacto',

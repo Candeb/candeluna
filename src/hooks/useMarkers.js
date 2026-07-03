@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import { moonShots } from '../data/moonShots'
 
@@ -11,7 +12,7 @@ import {
   MARKER_PULLBACK_PROGRESS,
 } from '../data/cinematicTimeline'
 
-import { MARKER_PHASE, MARKER_TIMING } from '../data/markerState'
+import { MARKER_PHASE, getMarkerTiming, getPeakSettleFrames, MARKER_TIMING } from '../data/markerState'
 
 import {
 
@@ -35,7 +36,7 @@ import {
 
 } from './markerAnimations'
 
-import { createMoonDragState } from './useCinematicTimeline'
+import { createMoonDragState, clearUserMoonOrientation, freezeUserMoonOrientation, releaseUserMoonForCinematicJourney, beginZoomHold, endZoomHold, releaseZoomHoldForExit, finishZoomHoldEgress, syncScrollTimelineProgress } from './useCinematicTimeline'
 
 
 
@@ -66,6 +67,8 @@ function hasVisibleMarker(phase) {
 export function useMarkers({
 
   lenis,
+
+  scrollTimelineRef,
 
   cinematicStateRef,
 
@@ -109,6 +112,10 @@ export function useMarkers({
 
   const breathingUntilRef = useRef(0)
 
+  const settleFramesRef = useRef(0)
+
+  const scrollStDisabledRef = useRef(false)
+
 
 
   const setPhaseSync = useCallback((next) => {
@@ -149,27 +156,76 @@ export function useMarkers({
 
   }, [lenis, scrollLockRef])
 
+  const disableScrollTimeline = useCallback(() => {
+    const st = scrollTimelineRef?.current?.scrollTrigger
+    if (!st || scrollStDisabledRef.current) return
+    st.disable(false, true)
+    scrollStDisabledRef.current = true
+  }, [scrollTimelineRef])
 
+  const enableScrollTimeline = useCallback(() => {
+    const st = scrollTimelineRef?.current?.scrollTrigger
+    if (!st || !scrollStDisabledRef.current) return
+    st.enable(false, true)
+    scrollStDisabledRef.current = false
+    ScrollTrigger.refresh()
+  }, [scrollTimelineRef])
 
   const unlockScroll = useCallback(() => {
-
     scrollLockRef.current = false
-
     if (!finaleActive) lenis?.start()
-
   }, [lenis, scrollLockRef, finaleActive])
 
 
 
   const startBreathingPause = useCallback(() => {
 
-    breathingUntilRef.current = Date.now() + MARKER_TIMING.breathingPause * 1000
+    breathingUntilRef.current = Date.now() + getMarkerTiming(false).breathingPause * 1000
 
   }, [])
 
 
 
   const isBreathingReady = useCallback(() => Date.now() >= breathingUntilRef.current, [])
+
+  const snapToSectionPeak = useCallback(
+    (index) => {
+      const st = scrollTimelineRef?.current?.scrollTrigger
+      if (!st || !lenis) return
+
+      const progress = MARKER_EMERGE_PROGRESS[index]
+      if (progress == null) return
+
+      const y = st.start + progress * (st.end - st.start)
+      lenis.scrollTo(y, { immediate: true })
+    },
+    [lenis, scrollTimelineRef],
+  )
+
+  const holdAtZoomPeak = useCallback(
+    (index) =>
+      new Promise((resolve) => {
+        const state = cinematicStateRef.current
+        const isMobile = Boolean(state?.isMobile)
+        const entryTiming = getMarkerTiming(isMobile)
+
+        lockScroll()
+        snapToSectionPeak(index)
+        disableScrollTimeline()
+
+        if (state) {
+          state.approachFrozen = true
+        }
+
+        gsap.delayedCall(entryTiming.entryZoomHold, () => {
+          if (state) {
+            beginZoomHold(state, index)
+          }
+          resolve()
+        })
+      }),
+    [cinematicStateRef, lockScroll, snapToSectionPeak, disableScrollTimeline],
+  )
 
 
 
@@ -253,6 +309,15 @@ export function useMarkers({
 
       exitPendingRef.current = true
 
+      const state = cinematicStateRef.current
+      syncScrollTimelineProgress(scrollTimelineRef, lenis)
+
+      const hideDur = fast ? MARKER_TIMING.fastCardHide : MARKER_TIMING.cardHide
+      if (state) {
+        releaseZoomHoldForExit(state, hideDur)
+      }
+      enableScrollTimeline()
+
       killTimeline()
 
       armedRef.current.delete(index)
@@ -274,7 +339,13 @@ export function useMarkers({
         setPhaseSync(MARKER_PHASE.HIDDEN)
 
         const state = cinematicStateRef.current
-        if (state) state.moonHold = null
+        if (state) {
+          finishZoomHoldEgress(state)
+          state.moonHold = null
+          if (index === 0) {
+            releaseUserMoonForCinematicJourney(state, 0)
+          }
+        }
 
         startBreathingPause()
 
@@ -282,7 +353,7 @@ export function useMarkers({
 
     },
 
-    [killTimeline, runExit, setIndexSync, setPhaseSync, startBreathingPause, cinematicStateRef],
+    [killTimeline, runExit, setIndexSync, setPhaseSync, startBreathingPause, cinematicStateRef, enableScrollTimeline, scrollTimelineRef, lenis],
 
   )
 
@@ -319,10 +390,17 @@ export function useMarkers({
           state.dragEnabled = false
 
           const shot = moonShots[index]
-          state.moonHold = { x: shot.moon.x, y: shot.moon.y }
-          state.moon.x = shot.moon.x
-          state.moon.y = shot.moon.y
-          state.moonDrag = createMoonDragState()
+
+          if (state.moonUserLocked && index === 0) {
+            // Solo la primera sección: marcador anclado a la vista del usuario
+            state.moonHold = null
+          } else {
+            clearUserMoonOrientation(state)
+            state.moonHold = { x: shot.moon.x, y: shot.moon.y }
+            state.moon.x = shot.moon.x
+            state.moon.y = shot.moon.y
+            state.moonDrag = createMoonDragState()
+          }
 
         }
 
@@ -426,9 +504,11 @@ export function useMarkers({
 
 
 
-        tl.to({}, { duration: MARKER_TIMING.beaconToLinePause })
+        const entryTiming = getMarkerTiming(Boolean(cinematicStateRef.current?.isMobile))
 
-        tl.add(animateLineDraw(els))
+        tl.to({}, { duration: entryTiming.beaconToLinePause })
+
+        tl.add(animateLineDraw({ ...els, cinematicStateRef }))
 
         tl.call(() => setPhaseSync(MARKER_PHASE.CARD))
 
@@ -439,6 +519,8 @@ export function useMarkers({
             revealEl: els.revealEl,
 
             linkEl: els.linkEl,
+
+            cinematicStateRef,
 
             onReady: () => {
 
@@ -508,6 +590,8 @@ export function useMarkers({
           return
         }
 
+        await holdAtZoomPeak(index)
+
         await showBeacon(index)
 
         if (phaseRef.current === MARKER_PHASE.BEACON) {
@@ -529,6 +613,16 @@ export function useMarkers({
       revealLineAndCard,
 
       triggerSectionExit,
+
+      enableScrollTimeline,
+
+      cinematicStateRef,
+
+      lockScroll,
+
+      cinematicStateRef,
+
+      holdAtZoomPeak,
 
     ],
 
@@ -569,6 +663,8 @@ export function useMarkers({
     killTimeline()
 
     armedRef.current.clear()
+
+    settleFramesRef.current = 0
 
     busyRef.current = false
 
@@ -612,6 +708,9 @@ export function useMarkers({
 
       state.moonHold = null
 
+      clearUserMoonOrientation(state)
+
+      endZoomHold(state)
     }
 
 
@@ -620,7 +719,7 @@ export function useMarkers({
 
     unlockScroll()
 
-  }, [cardRefs, pathRefs, cinematicStateRef, killTimeline, unlockScroll])
+  }, [cardRefs, pathRefs, cinematicStateRef, killTimeline, unlockScroll, enableScrollTimeline])
 
 
 
@@ -680,9 +779,13 @@ export function useMarkers({
 
       state.moonHold = null
 
+      endZoomHold(state)
+
     }
 
-  }, [cardRefs, pathRefs, cinematicStateRef, killTimeline])
+    enableScrollTimeline()
+
+  }, [cardRefs, pathRefs, cinematicStateRef, killTimeline, enableScrollTimeline])
 
 
 
@@ -712,7 +815,10 @@ export function useMarkers({
 
         const state = cinematicStateRef.current
 
-        if (state) state.dragEnabled = true
+        if (state) {
+          state.dragEnabled = true
+          clearUserMoonOrientation(state)
+        }
 
       }
 
@@ -727,9 +833,8 @@ export function useMarkers({
     const state = cinematicStateRef.current
 
     if (state) {
-
       state.dragEnabled = false
-
+      freezeUserMoonOrientation(state)
     }
 
 
@@ -738,18 +843,21 @@ export function useMarkers({
 
     const currentPhase = phaseRef.current
 
-    const chapterFromScroll = getCurrentSectionFromProgress(scrollProgress)
+    const progress =
+      cinematicStateRef.current?.scrollProgress ?? scrollProgress
+
+    const chapterFromScroll = getCurrentSectionFromProgress(progress)
 
     if (current >= 0 && hasVisibleMarker(currentPhase) && !exitPendingRef.current) {
       const pullThreshold =
         MARKER_PULLBACK_PROGRESS[current] ?? MARKER_EMERGE_PROGRESS[current]
 
-      const enteringPullback = scrollProgress >= pullThreshold - PULLBACK_EPS
+      const enteringPullback = progress >= pullThreshold - PULLBACK_EPS
 
       const leavingByScrollBack =
         scrollingBack &&
         (chapterFromScroll !== current ||
-          scrollProgress < MARKER_EMERGE_PROGRESS[current] - APPROACH_EPS)
+          progress < MARKER_EMERGE_PROGRESS[current] - APPROACH_EPS)
 
       if (enteringPullback || leavingByScrollBack) {
         if (busyRef.current) return
@@ -763,6 +871,44 @@ export function useMarkers({
     cinematicStateRef,
     triggerSectionExit,
   ])
+
+  useEffect(() => {
+    if (!lenis || finaleActive) return undefined
+
+    const syncDuringHold = () => {
+      const state = cinematicStateRef.current
+      if (!state?.zoomHoldActive) return
+
+      const st = scrollTimelineRef.current?.scrollTrigger
+      if (!st) return
+
+      const span = st.end - st.start
+      if (span <= 0) return
+
+      state.scrollProgress = gsap.utils.clamp(0, 1, (lenis.scroll - st.start) / span)
+
+      const current = activeIndexRef.current
+      const currentPhase = phaseRef.current
+      if (
+        current < 0 ||
+        !hasVisibleMarker(currentPhase) ||
+        exitPendingRef.current ||
+        busyRef.current
+      ) {
+        return
+      }
+
+      const pullThreshold =
+        MARKER_PULLBACK_PROGRESS[current] ?? MARKER_EMERGE_PROGRESS[current]
+
+      if (state.scrollProgress >= pullThreshold - PULLBACK_EPS) {
+        triggerSectionExit(current).then(() => {})
+      }
+    }
+
+    lenis.on('scroll', syncDuringHold)
+    return () => lenis.off('scroll', syncDuringHold)
+  }, [lenis, finaleActive, cinematicStateRef, scrollTimelineRef, triggerSectionExit])
 
   useEffect(() => {
     if (finaleActive) return undefined
@@ -789,7 +935,16 @@ export function useMarkers({
       }
 
       const target = getMarkerTargetFromProgress(progress, state)
-      if (target < 0 || armedRef.current.has(target)) return
+      if (target < 0) {
+        settleFramesRef.current = 0
+        return
+      }
+
+      const settleFramesNeeded = getPeakSettleFrames(Boolean(state.isMobile))
+      settleFramesRef.current += 1
+      if (settleFramesRef.current < settleFramesNeeded) return
+
+      if (armedRef.current.has(target)) return
 
       const pullThreshold = MARKER_PULLBACK_PROGRESS[target]
       if (pullThreshold != null && progress >= pullThreshold - PULLBACK_EPS) return

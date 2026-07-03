@@ -14,6 +14,26 @@ export function getPullbackForShot(shot, isMobile) {
   return shot.pullbackMobile ?? shot.pullback
 }
 
+/** Cámara un poco más alejada en móvil — menos zoom, más definición lunar */
+export const MOBILE_CAMERA = {
+  zOffset: 0.22,
+  fovOffset: 1.75,
+}
+
+export function getShotCameraForDevice(shot, isMobile) {
+  if (!isMobile) {
+    return { camera: shot.camera, fov: shot.fov }
+  }
+  return {
+    camera: {
+      x: shot.camera.x,
+      y: shot.camera.y,
+      z: shot.camera.z + MOBILE_CAMERA.zOffset,
+    },
+    fov: shot.fov + MOBILE_CAMERA.fovOffset,
+  }
+}
+
 /** Cámara centrada; cada región apunta a una zona distinta de la luna. */
 export const moonShots = services.map((service, index) => {
   const profile = MOON_REGIONS[service.slug]

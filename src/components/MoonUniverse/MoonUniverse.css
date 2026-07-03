@@ -139,6 +139,15 @@
   pointer-events: none;
 }
 
+.cinematic__viewport:not(.is-card-navigable) .cinematic__cards,
+.cinematic__viewport:not(.is-card-navigable) .cinematic__cards * {
+  pointer-events: none !important;
+}
+
+.cinematic__viewport.is-card-navigable .region-chapter.is-navigable .region-card.is-interactive {
+  pointer-events: auto;
+}
+
 .cinematic__viewport.is-exploring .cinematic__cards,
 .cinematic__viewport.is-marker-flow .cinematic__cards {
   z-index: 20;

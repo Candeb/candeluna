@@ -2,14 +2,15 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stars, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { createMoonDragState } from '../hooks/useCinematicTimeline'
-import { INTRO_SHOT, moonShots, getPullbackForShot } from '../data/moonShots'
+import { createMoonDragState, finishZoomHoldEgress } from '../hooks/useCinematicTimeline'
+import { INTRO_SHOT, moonShots, getPullbackForShot, getShotCameraForDevice } from '../data/moonShots'
 import { getCurrentSectionFromProgress } from '../data/cinematicTimeline'
 import AmbientSpaceEffects, { MoonLimbGlow } from './MoonAmbience.jsx'
 import './MoonHero.css'
 
 const MOON_URL = '/models/moon.glb'
 const CAMERA_SMOOTH = 0.055
+const CAMERA_SMOOTH_MOBILE = 0.095
 const MOON_SMOOTH = 0.05
 const MOON_DRAG_SMOOTH = 0.32
 const DRAG_RAD_PER_PX = 0.0029
@@ -124,6 +125,7 @@ function MoonDragTarget({ cinematicStateRef, dragEnabled }) {
 
     drag.vx = 0
     drag.vy = 0
+    drag.hasUserInput = true
   }
 
   const removeWindowListeners = () => {
@@ -318,39 +320,87 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
     const state = cinematicStateRef?.current
     if (!state) return
 
-    camera.position.x = THREE.MathUtils.lerp(
-      camera.position.x,
-      state.camera.x,
-      CAMERA_SMOOTH,
-    )
-    camera.position.y = THREE.MathUtils.lerp(
-      camera.position.y,
-      state.camera.y,
-      CAMERA_SMOOTH,
-    )
-    camera.position.z = THREE.MathUtils.lerp(
-      camera.position.z,
-      state.camera.z,
-      CAMERA_SMOOTH,
-    )
+    const isMobile = Boolean(state.isMobile)
+    const cameraSmooth = isMobile ? CAMERA_SMOOTH_MOBILE : CAMERA_SMOOTH
+    const snapNow = Boolean(state.forceCameraSnap)
+    const egress = state.zoomHoldEgress
+    const frozen =
+      (state.approachFrozen || state.zoomHoldActive) && !egress
+    const zoomHold = state.zoomHoldActive ? state.zoomHold : null
 
-    lookAt.set(state.target.x, state.target.y, state.target.z)
-    camera.lookAt(lookAt)
-
-    const nextFov = THREE.MathUtils.lerp(camera.fov, state.fov, CAMERA_SMOOTH)
-    if (Math.abs(camera.fov - nextFov) > 0.001) {
-      camera.fov = nextFov
+    if (egress && zoomHold) {
+      const elapsed = performance.now() - egress.startTime
+      const t = Math.min(1, elapsed / (egress.duration * 1000))
+      const ease = t * t * (3 - 2 * t)
+      camera.position.set(
+        THREE.MathUtils.lerp(egress.fromCamera.x, state.camera.x, ease),
+        THREE.MathUtils.lerp(egress.fromCamera.y, state.camera.y, ease),
+        THREE.MathUtils.lerp(egress.fromCamera.z, state.camera.z, ease),
+      )
+      camera.fov = THREE.MathUtils.lerp(egress.fromFov, state.fov, ease)
       camera.updateProjectionMatrix()
+      state.forceCameraSnap = false
+      if (t >= 1) {
+        finishZoomHoldEgress(state)
+      }
+    } else if (zoomHold) {
+      camera.position.set(zoomHold.camera.x, zoomHold.camera.y, zoomHold.camera.z)
+      camera.fov = zoomHold.fov
+      camera.updateProjectionMatrix()
+      state.forceCameraSnap = false
+    } else if (frozen) {
+      // Pausa en pico — sin lerp hasta fijar zoomHold
+    } else if (snapNow) {
+      camera.position.set(state.camera.x, state.camera.y, state.camera.z)
+      camera.fov = state.fov
+      camera.updateProjectionMatrix()
+      state.forceCameraSnap = false
+    } else {
+      camera.position.x = THREE.MathUtils.lerp(
+        camera.position.x,
+        state.camera.x,
+        cameraSmooth,
+      )
+      camera.position.y = THREE.MathUtils.lerp(
+        camera.position.y,
+        state.camera.y,
+        cameraSmooth,
+      )
+      camera.position.z = THREE.MathUtils.lerp(
+        camera.position.z,
+        state.camera.z,
+        cameraSmooth,
+      )
+
+      const nextFov = THREE.MathUtils.lerp(camera.fov, state.fov, cameraSmooth)
+      if (Math.abs(camera.fov - nextFov) > 0.001) {
+        camera.fov = nextFov
+        camera.updateProjectionMatrix()
+      }
     }
 
+    const lookTarget = zoomHold?.target ?? state.target
+    lookAt.set(lookTarget.x, lookTarget.y, lookTarget.z)
+    camera.lookAt(lookAt)
+
     const journeySection = getCurrentSectionFromProgress(state.scrollProgress ?? 0)
-    if (journeySection >= 0 && moonShots[journeySection]) {
-      const isMobile = window.matchMedia('(max-width: 768px)').matches
+    if (state.zoomHoldEgress) {
+      state.visualApproachT = THREE.MathUtils.lerp(
+        1,
+        state.visualApproachT ?? 1,
+        0.08,
+      )
+    } else if (state.zoomHoldActive) {
+      state.visualApproachT = 1
+      state.cameraSettleZDelta = 0
+      state.cameraSettleYDelta = 0
+    } else if (journeySection >= 0 && moonShots[journeySection]) {
+      const shot = moonShots[journeySection]
       const startZ =
         journeySection === 0
           ? INTRO_SHOT.camera.z
-          : getPullbackForShot(moonShots[journeySection], isMobile).z
-      const endZ = moonShots[journeySection].camera.z
+          : getPullbackForShot(shot, isMobile).z
+      const endZ = getShotCameraForDevice(shot, isMobile).camera.z
       const span = startZ - endZ
       state.visualApproachT =
         span > 0.01
@@ -365,29 +415,42 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
     }
 
     if (moonRef.current) {
-      if (state.moonHold) {
+      const drag = state.moonDrag ?? createMoonDragState()
+
+      if (state.moonUserLocked && state.moonUserQuat) {
+        _targetQuat.copy(state.moonUserQuat)
+      } else if (state.moonHold) {
         state.moon.x = state.moonHold.x
         state.moon.y = state.moonHold.y
-      }
-
-      const drag = state.moonDrag ?? createMoonDragState()
-      const moonX = state.moonHold?.x ?? state.moon.x
-      const moonY = state.moonHold?.y ?? state.moon.y
-      _euler.set(moonX, moonY, 0)
-      _baseQuat.setFromEuler(_euler)
-      _targetQuat.copy(_baseQuat)
-      if (drag.quaternion && state.dragEnabled && moonDragEnabled) {
-        _targetQuat.premultiply(drag.quaternion)
+        _euler.set(state.moonHold.x, state.moonHold.y, 0)
+        _baseQuat.setFromEuler(_euler)
+        _targetQuat.copy(_baseQuat)
+      } else {
+        _euler.set(state.moon.x, state.moon.y, 0)
+        _baseQuat.setFromEuler(_euler)
+        _targetQuat.copy(_baseQuat)
+        if (drag.quaternion && moonDragEnabled) {
+          _targetQuat.premultiply(drag.quaternion)
+        }
       }
 
       const smooth =
-        state.dragEnabled && moonDragEnabled
+        moonDragEnabled && state.dragEnabled
           ? MOON_DRAG_SMOOTH
-          : MOON_SMOOTH
+          : state.moonUserLocked
+            ? 1
+            : MOON_SMOOTH
 
-      moonRef.current.quaternion.slerp(_targetQuat, smooth)
+      if (snapNow) {
+        moonRef.current.quaternion.copy(_targetQuat)
+      } else if (!frozen) {
+        moonRef.current.quaternion.slerp(_targetQuat, smooth)
+      }
 
-      if (journeySection >= 0 && moonShots[journeySection] && !state.moonHold) {
+      if (state.moonUserLocked && journeySection === 0 && !state.moonHold) {
+        // Primera sección con orientación del usuario
+        state.moonSettleAngle = 0
+      } else if (journeySection >= 0 && moonShots[journeySection] && !state.moonHold) {
         const targetMoon = moonShots[journeySection].moon
         _euler.set(targetMoon.x, targetMoon.y, 0)
         _stepQuat.setFromEuler(_euler)
@@ -411,7 +474,7 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
       <AmbientSpaceEffects />
       <group ref={moonRef}>
         <Suspense fallback={null}>
-          <MoonModel acceptPointer={!moonDragEnabled} />
+          <MoonModel acceptPointer={false} />
         </Suspense>
         <MoonDragTarget cinematicStateRef={cinematicStateRef} dragEnabled={moonDragEnabled} />
       </group>

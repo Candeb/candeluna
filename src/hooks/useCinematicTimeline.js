@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import * as THREE from 'three'
-import { INTRO_SHOT, moonShots, getPullbackForShot } from '../data/moonShots'
+import { INTRO_SHOT, moonShots, getPullbackForShot, getShotCameraForDevice } from '../data/moonShots'
 import {
   FINAL_SEQUENCE_TIMING,
   FINALE_CAMERA,
@@ -22,8 +22,127 @@ export function createMoonDragState() {
     vx: 0,
     vy: 0,
     active: false,
+    hasUserInput: false,
     quaternion: new THREE.Quaternion(),
   }
+}
+
+const _freezeEuler = new THREE.Euler(0, 0, 0, 'YXZ')
+const _freezeBase = new THREE.Quaternion()
+const _freezeTarget = new THREE.Quaternion()
+
+/** Congela la orientación manual de la luna al empezar el scroll */
+export function freezeUserMoonOrientation(state) {
+  if (!state?.moonDrag?.hasUserInput || state.moonUserLocked) {
+    return Boolean(state.moonUserLocked)
+  }
+
+  _freezeEuler.set(state.moon.x, state.moon.y, 0)
+  _freezeBase.setFromEuler(_freezeEuler)
+  _freezeTarget.copy(_freezeBase)
+  if (state.moonDrag.quaternion) {
+    _freezeTarget.premultiply(state.moonDrag.quaternion)
+  }
+
+  if (!state.moonUserQuat) {
+    state.moonUserQuat = new THREE.Quaternion()
+  }
+  state.moonUserQuat.copy(_freezeTarget)
+  state.moonUserLocked = true
+  return true
+}
+
+export function clearUserMoonOrientation(state) {
+  if (!state) return
+  state.moonUserLocked = false
+  state.moonUserQuat = null
+}
+
+/** Tras la primera sección, retoma rotación cinematográfica por región */
+export function releaseUserMoonForCinematicJourney(state, sectionIndex = 0) {
+  if (!state?.moonUserLocked || sectionIndex !== 0) return false
+
+  const shot = moonShots[sectionIndex]
+  if (shot) {
+    state.moon.x = shot.moon.x
+    state.moon.y = shot.moon.y
+  }
+
+  state.moonDrag = createMoonDragState()
+  clearUserMoonOrientation(state)
+  return true
+}
+
+/** Congela cámara en el pico de zoom mientras marcador + tarjeta están visibles */
+export function beginZoomHold(state, sectionIndex) {
+  if (!state || sectionIndex < 0) return
+
+  const shot = moonShots[sectionIndex]
+  if (!shot) return
+
+  const { camera: shotCamera, fov: shotFov } = getShotCameraForDevice(
+    shot,
+    Boolean(state.isMobile),
+  )
+
+  state.zoomHoldActive = true
+  state.zoomHold = {
+    camera: { x: shotCamera.x, y: shotCamera.y, z: shotCamera.z },
+    target: { x: 0, y: 0, z: 0 },
+    fov: shotFov,
+  }
+  state.camera.x = shotCamera.x
+  state.camera.y = shotCamera.y
+  state.camera.z = shotCamera.z
+  state.fov = shotFov
+  state.approachFrozen = true
+  state.forceCameraSnap = true
+  state.visualApproachT = 1
+  state.cameraSettleZDelta = 0
+  state.cameraSettleYDelta = 0
+}
+
+export function endZoomHold(state) {
+  if (!state) return
+  state.zoomHoldActive = false
+  state.zoomHold = null
+  state.zoomHoldEgress = null
+  state.approachFrozen = false
+}
+
+/** Alinea el timeline GSAP con el scroll actual (sin scrub) */
+export function syncScrollTimelineProgress(timelineRef, lenis) {
+  const tl = timelineRef?.current
+  const st = tl?.scrollTrigger
+  if (!tl || !st || !lenis) return tl?.progress?.() ?? 0
+
+  const span = st.end - st.start
+  if (span <= 0) return tl.progress()
+
+  const progress = gsap.utils.clamp(0, 1, (lenis.scroll - st.start) / span)
+  tl.progress(progress)
+  return progress
+}
+
+/** Transición suave del pico de zoom al pullback — sincronizada con salida de tarjeta */
+export function releaseZoomHoldForExit(state, duration = 0.48) {
+  if (!state?.zoomHoldActive || !state.zoomHold) {
+    endZoomHold(state)
+    return
+  }
+
+  state.zoomHoldEgress = {
+    fromCamera: { ...state.zoomHold.camera },
+    fromFov: state.zoomHold.fov,
+    duration: Math.max(0.22, duration),
+    startTime: performance.now(),
+  }
+}
+
+export function finishZoomHoldEgress(state) {
+  if (!state) return
+  if (!state.zoomHoldEgress) return
+  endZoomHold(state)
 }
 
 export function createCinematicState() {
@@ -50,6 +169,14 @@ export function createCinematicState() {
     cameraSettleYDelta: Infinity,
     moonSettleAngle: Infinity,
     moonHold: null,
+    moonUserLocked: false,
+    moonUserQuat: null,
+    isMobile: false,
+    forceCameraSnap: false,
+    approachFrozen: false,
+    zoomHoldActive: false,
+    zoomHold: null,
+    zoomHoldEgress: null,
   }
 }
 
@@ -60,6 +187,8 @@ export function buildFinalMoonSequence({
   lastShot,
   outroRefs,
   journeyFooterRef,
+  onCtaReveal,
+  onRestartReveal,
 }) {
   const {
     pauseDur,
@@ -188,7 +317,13 @@ export function buildFinalMoonSequence({
   if (cta?.current) {
     finalMoonSequence.to(
       cta.current,
-      { opacity: 1, y: 0, duration: ctaDur, ease: 'power2.out' },
+      {
+        opacity: 1,
+        y: 0,
+        duration: ctaDur,
+        ease: 'power2.out',
+        onStart: () => onCtaReveal?.(),
+      },
       ctaStart,
     )
   }
@@ -196,7 +331,13 @@ export function buildFinalMoonSequence({
   if (restart?.current) {
     finalMoonSequence.to(
       restart.current,
-      { opacity: 1, y: 0, duration: restartDur, ease: 'power1.out' },
+      {
+        opacity: 1,
+        y: 0,
+        duration: restartDur,
+        ease: 'power1.out',
+        onStart: () => onRestartReveal?.(),
+      },
       restartStart,
     )
   }
@@ -246,6 +387,54 @@ export function resetFinaleVisuals({ state, outroRefs, journeyFooterRef, cardRef
   }
 }
 
+/** Restaura cámara, luna, timeline y scroll al estado inicial del viaje */
+export function resetJourneyToStart({
+  state,
+  timelineRef,
+  outroRefs,
+  journeyFooterRef,
+  cardRefs,
+  pathRefs,
+  onProgressChange,
+  onChapterChange,
+}) {
+  if (!state) return
+
+  gsap.set(state.camera, { ...INTRO_SHOT.camera })
+  gsap.set(state.target, { ...INTRO_SHOT.target })
+  gsap.set(state.moon, { ...INTRO_SHOT.moon })
+  gsap.set(state, {
+    fov: INTRO_SHOT.fov,
+    scrollProgress: 0,
+    visualApproachT: 0,
+    cameraSettleZDelta: Infinity,
+    cameraSettleYDelta: Infinity,
+    moonSettleAngle: Infinity,
+    moonHold: null,
+  })
+  clearUserMoonOrientation(state)
+  endZoomHold(state)
+  state.moonDrag = createMoonDragState()
+  state.forceCameraSnap = true
+
+  resetFinaleVisuals({ state, outroRefs, journeyFooterRef, cardRefs, pathRefs })
+
+  const tl = timelineRef?.current
+  if (tl) {
+    const st = tl.scrollTrigger
+    st?.enable()
+    tl.progress(0)
+    if (st) {
+      st.scroll(st.start)
+    }
+  }
+
+  state.scrollProgress = 0
+  onProgressChange?.(0)
+  onChapterChange?.(-1)
+  ScrollTrigger.update()
+}
+
 /**
  * Timeline GSAP con dos capas:
  * 1) Cámara + luna (scrub continuo)
@@ -263,9 +452,16 @@ export function useCinematicTimeline({
   onChapterChange,
   onProgressChange,
   freeScrollRef,
+  onCtaReveal,
+  onRestartReveal,
 }) {
   const timelineRef = useRef(null)
   const finalSequenceRef = useRef(null)
+  const onCtaRevealRef = useRef(onCtaReveal)
+  const onRestartRevealRef = useRef(onRestartReveal)
+
+  onCtaRevealRef.current = onCtaReveal
+  onRestartRevealRef.current = onRestartReveal
 
   useEffect(() => {
     const track = trackRef.current
@@ -273,6 +469,7 @@ export function useCinematicTimeline({
     if (!track || !state) return undefined
 
     const isMobile = window.matchMedia('(max-width: 768px)').matches
+    state.isMobile = isMobile
 
     hideAllMarkers(cardRefs, pathRefs)
 
@@ -297,7 +494,7 @@ export function useCinematicTimeline({
         trigger: track,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 3.4,
+        scrub: isMobile ? 2.5 : 3.4,
         invalidateOnRefresh: true,
         snap: {
           snapTo: (progress) => {
@@ -316,8 +513,8 @@ export function useCinematicTimeline({
 
             return nearest
           },
-          duration: 0.65,
-          delay: 0.12,
+          duration: isMobile ? 0.82 : 0.65,
+          delay: isMobile ? 0.06 : 0.12,
           ease: 'power2.inOut',
         },
         onUpdate: (self) => {
@@ -365,12 +562,14 @@ export function useCinematicTimeline({
         cursor += pullDur
       }
 
+      const { camera: shotCamera, fov: shotFov } = getShotCameraForDevice(shot, isMobile)
+
       tl.to(
         state.camera,
         {
-          x: shot.camera.x,
-          y: shot.camera.y,
-          z: shot.camera.z,
+          x: shotCamera.x,
+          y: shotCamera.y,
+          z: shotCamera.z,
           duration: approachDur,
           ease: travelEase,
         },
@@ -388,7 +587,7 @@ export function useCinematicTimeline({
       )
       tl.to(
         state,
-        { fov: shot.fov, duration: approachDur, ease: travelEase },
+        { fov: shotFov, duration: approachDur, ease: travelEase },
         cursor,
       )
 
@@ -417,6 +616,8 @@ export function useCinematicTimeline({
       lastShot,
       outroRefs,
       journeyFooterRef,
+      onCtaReveal: () => onCtaRevealRef.current?.(),
+      onRestartReveal: () => onRestartRevealRef.current?.(),
     })
 
     ScrollTrigger.refresh()
@@ -439,6 +640,8 @@ export function useCinematicTimeline({
     onChapterChange,
     onProgressChange,
     freeScrollRef,
+    onCtaReveal,
+    onRestartReveal,
   ])
 
   return { timelineRef, finalSequenceRef }

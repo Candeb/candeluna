@@ -1,6 +1,6 @@
 import { gsap } from 'gsap'
 
-import { MARKER_TIMING } from '../data/markerState'
+import { getMarkerTiming, MARKER_TIMING } from '../data/markerState'
 
 
 
@@ -64,13 +64,15 @@ export function resetMarkerDom({ chapterEl, pathEl, connectorEl, revealEl, linkE
 
       pointerEvents: 'none',
 
+      clearProps: 'pointerEvents',
+
     })
 
   }
 
   if (linkEl) {
 
-    gsap.set(linkEl, { pointerEvents: 'none' })
+    gsap.set(linkEl, { pointerEvents: 'none', clearProps: 'pointerEvents' })
 
   }
 
@@ -130,7 +132,7 @@ export function animateBeaconIn(cinematicStateRef) {
 
   if (!state) return gsap.timeline()
 
-
+  const timing = getMarkerTiming(state.isMobile)
 
   state.beaconYOffset = 0.14
 
@@ -148,7 +150,7 @@ export function animateBeaconIn(cinematicStateRef) {
 
     beaconScale: 1,
 
-    duration: MARKER_TIMING.beaconEmerge,
+    duration: timing.beaconEmerge,
 
     ease: 'power3.out',
 
@@ -194,8 +196,8 @@ export function animateBeaconOut(cinematicStateRef, { fast = false } = {}) {
 
 
 
-export function animateLineDraw({ chapterEl, pathEl, connectorEl }) {
-
+export function animateLineDraw({ chapterEl, pathEl, connectorEl, cinematicStateRef }) {
+  const timing = getMarkerTiming(cinematicStateRef?.current?.isMobile)
   const tl = gsap.timeline()
 
 
@@ -228,7 +230,7 @@ export function animateLineDraw({ chapterEl, pathEl, connectorEl }) {
 
     strokeDashoffset: 0,
 
-    duration: MARKER_TIMING.lineDraw,
+    duration: timing.lineDraw,
 
     ease: 'power1.inOut',
 
@@ -242,8 +244,8 @@ export function animateLineDraw({ chapterEl, pathEl, connectorEl }) {
 
 
 
-export function animateCardIn({ revealEl, linkEl, onReady }) {
-
+export function animateCardIn({ revealEl, linkEl, onReady, cinematicStateRef }) {
+  const timing = getMarkerTiming(cinematicStateRef?.current?.isMobile)
   const tl = gsap.timeline({ onComplete: onReady })
 
 
@@ -278,7 +280,7 @@ export function animateCardIn({ revealEl, linkEl, onReady }) {
 
     y: 0,
 
-    duration: MARKER_TIMING.cardReveal,
+    duration: timing.cardReveal,
 
     ease: 'power2.out',
 

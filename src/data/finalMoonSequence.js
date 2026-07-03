@@ -13,6 +13,23 @@ export const FINAL_SEQUENCE_TIMING = {
   restartDur: 0.8,
 }
 
+/** Momento en que deben aparecer los CTAs del outro (segundos desde inicio del finale) */
+export function getFinaleCtaRevealDelayMs() {
+  const { pauseDur, dollyDur, ctaDelay } = FINAL_SEQUENCE_TIMING
+  const messageStart = pauseDur + dollyDur + 0.5
+  const ctaStart = messageStart + ctaDelay
+  return ctaStart * 1000
+}
+
+/** Momento en que debe aparecer el botón de reinicio (después de los CTAs) */
+export function getFinaleRestartRevealDelayMs() {
+  const { pauseDur, dollyDur, ctaDelay, ctaDur, restartHold } = FINAL_SEQUENCE_TIMING
+  const messageStart = pauseDur + dollyDur + 0.5
+  const ctaStart = messageStart + ctaDelay
+  const restartStart = ctaStart + ctaDur + restartHold
+  return restartStart * 1000
+}
+
 export const FINALE_CAMERA = {
   x: 0,
   y: 0.05,

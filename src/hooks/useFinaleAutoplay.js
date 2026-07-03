@@ -21,6 +21,7 @@ export function useFinaleAutoplay({
   scrollProgress,
   freeScrollRef,
   scrollLockRef,
+  journeyRestartingRef,
   onFinaleStart,
   onFinaleComplete,
 }) {
@@ -68,6 +69,7 @@ export function useFinaleAutoplay({
 
   const scheduleAutoFinale = useCallback(() => {
     if (
+      journeyRestartingRef?.current ||
       freeScrollRef?.current ||
       finaleScheduledRef.current ||
       finalePlayingRef.current ||
@@ -83,7 +85,7 @@ export function useFinaleAutoplay({
       finaleTimerRef.current = null
       playFinale()
     }, FINALE_AUTO_DELAY_MS)
-  }, [freeScrollRef, lockJourneyScroll, playFinale])
+  }, [freeScrollRef, journeyRestartingRef, lockJourneyScroll, playFinale])
 
   const clearFinaleTimer = useCallback(() => {
     if (finaleTimerRef.current != null) {
@@ -95,7 +97,10 @@ export function useFinaleAutoplay({
 
   const resetFinale = useCallback(() => {
     clearFinaleTimer()
-    finalSequenceRef.current?.pause(0).progress(0)
+    const finale = finalSequenceRef.current
+    finale?.eventCallback('onComplete', null)
+    finale?.pause(0)
+    finale?.progress(0)
     finalePlayingRef.current = false
     finalePlayedRef.current = false
     atJourneyEndRef.current = false
@@ -123,11 +128,12 @@ export function useFinaleAutoplay({
 
   const tryAutoFinale = useCallback(
     (atEnd) => {
+      if (journeyRestartingRef?.current) return
       atJourneyEndRef.current = atEnd
       if (!atEnd) return
       scheduleAutoFinale()
     },
-    [scheduleAutoFinale],
+    [journeyRestartingRef, scheduleAutoFinale],
   )
 
   useEffect(() => {
@@ -152,7 +158,7 @@ export function useFinaleAutoplay({
     }
 
     const blockScroll = (event) => {
-      if (freeScrollRef?.current) return
+      if (freeScrollRef?.current || journeyRestartingRef?.current) return
       if (
         journeyLockedRef.current ||
         finalePlayingRef.current ||
@@ -177,6 +183,7 @@ export function useFinaleAutoplay({
     scrollProgress,
     freeScrollRef,
     scrollLockRef,
+    journeyRestartingRef,
     tryAutoFinale,
     clearFinaleTimer,
   ])

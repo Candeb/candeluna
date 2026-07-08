@@ -209,28 +209,31 @@ function MoonDragTarget({ cinematicStateRef, dragEnabled }) {
 function CinematicLights({ cinematicStateRef, sunRef, fillRef, rimRef, ambientRef }) {
   useFrame(() => {
     const lighting = cinematicStateRef?.current?.lighting
+    const introEmerging = Boolean(cinematicStateRef?.current?.introEmerging)
     if (!lighting) return
+
+    const lightSmooth = introEmerging ? 1 : LIGHT_SMOOTH
 
     if (sunRef.current) {
       sunRef.current.position.x = THREE.MathUtils.lerp(
         sunRef.current.position.x,
         lighting.sunX,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
       sunRef.current.position.y = THREE.MathUtils.lerp(
         sunRef.current.position.y,
         lighting.sunY,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
       sunRef.current.position.z = THREE.MathUtils.lerp(
         sunRef.current.position.z,
         lighting.sunZ,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
       sunRef.current.intensity = THREE.MathUtils.lerp(
         sunRef.current.intensity,
         lighting.sunIntensity,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
     }
 
@@ -239,7 +242,7 @@ function CinematicLights({ cinematicStateRef, sunRef, fillRef, rimRef, ambientRe
       fillRef.current.intensity = THREE.MathUtils.lerp(
         fillRef.current.intensity,
         lighting.fillIntensity,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
     }
 
@@ -248,7 +251,7 @@ function CinematicLights({ cinematicStateRef, sunRef, fillRef, rimRef, ambientRe
       rimRef.current.intensity = THREE.MathUtils.lerp(
         rimRef.current.intensity,
         lighting.rimIntensity,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
     }
 
@@ -256,7 +259,7 @@ function CinematicLights({ cinematicStateRef, sunRef, fillRef, rimRef, ambientRe
       ambientRef.current.intensity = THREE.MathUtils.lerp(
         ambientRef.current.intensity,
         lighting.ambient,
-        LIGHT_SMOOTH,
+        lightSmooth,
       )
     }
   })
@@ -296,13 +299,13 @@ function StarField({ cinematicStateRef }) {
   return (
     <Stars
       ref={starsRef}
-      radius={90}
-      depth={55}
-      count={2800}
-      factor={3.8}
+      radius={100}
+      depth={70}
+      count={5200}
+      factor={2.2}
       saturation={0}
       fade
-      speed={0.15}
+      speed={0.08}
     />
   )
 }
@@ -323,6 +326,7 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
     const isMobile = Boolean(state.isMobile)
     const cameraSmooth = isMobile ? CAMERA_SMOOTH_MOBILE : CAMERA_SMOOTH
     const snapNow = Boolean(state.forceCameraSnap)
+    const introEmerging = Boolean(state.introEmerging)
     const egress = state.zoomHoldEgress
     const frozen =
       (state.approachFrozen || state.zoomHoldActive) && !egress
@@ -350,11 +354,11 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
       state.forceCameraSnap = false
     } else if (frozen) {
       // Pausa en pico — sin lerp hasta fijar zoomHold
-    } else if (snapNow) {
+    } else if (introEmerging || snapNow) {
       camera.position.set(state.camera.x, state.camera.y, state.camera.z)
       camera.fov = state.fov
       camera.updateProjectionMatrix()
-      state.forceCameraSnap = false
+      if (snapNow && !introEmerging) state.forceCameraSnap = false
     } else {
       camera.position.x = THREE.MathUtils.lerp(
         camera.position.x,
@@ -484,6 +488,7 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
 
 export default function MoonHero({
   visible = true,
+  introDormant = false,
   cinematicStateRef,
   moonDragEnabled = false,
 }) {
@@ -499,7 +504,7 @@ export default function MoonHero({
 
   return (
     <div
-      className={`moon-hero ${visible ? 'is-visible' : ''} ${moonDragEnabled ? 'is-draggable' : ''}`}
+      className={`moon-hero ${visible ? 'is-visible' : ''} ${introDormant ? 'is-intro-dormant' : ''} ${moonDragEnabled ? 'is-draggable' : ''}`}
     >
       <div className="moon-hero__flare" aria-hidden="true" />
       <Canvas

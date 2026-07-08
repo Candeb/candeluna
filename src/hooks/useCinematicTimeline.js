@@ -177,6 +177,7 @@ export function createCinematicState() {
     zoomHoldActive: false,
     zoomHold: null,
     zoomHoldEgress: null,
+    introEmerging: false,
   }
 }
 
@@ -416,6 +417,7 @@ export function resetJourneyToStart({
   endZoomHold(state)
   state.moonDrag = createMoonDragState()
   state.forceCameraSnap = true
+  state.introEmerging = false
 
   resetFinaleVisuals({ state, outroRefs, journeyFooterRef, cardRefs, pathRefs })
 

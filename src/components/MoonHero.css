@@ -20,6 +20,13 @@
   filter: blur(0);
 }
 
+.moon-hero.is-intro-dormant {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition: none;
+}
+
 .moon-hero__canvas {
   width: 100%;
   height: 100%;

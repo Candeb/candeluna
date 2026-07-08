@@ -7,6 +7,40 @@
   pointer-events: auto;
 }
 
+.journey--intro {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 102;
+}
+
+.journey--intro .journey__bar {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  cursor: default;
+  pointer-events: none;
+}
+
+.journey--intro .journey__bar-track {
+  opacity: 0;
+}
+
+.journey__hint--hidden,
+.journey__controls--hidden,
+.journey__meta--hidden {
+  visibility: hidden;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .journey__hint {
   margin: 0;
   font-family: var(--mono);

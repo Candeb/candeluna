@@ -14,9 +14,11 @@ import { useMarkers } from '../../hooks/useMarkers'
 import { MARKER_PHASE } from '../../data/markerState'
 import MoonHero from '../MoonHero.jsx'
 import RegionChapter from './RegionChapter.jsx'
-import JourneyProgress from './JourneyProgress.jsx'
+import TopProgressBar from './TopProgressBar.jsx'
 import FinalOutro from './FinalOutro.jsx'
 import ScreenCenterMarker from './ScreenCenterMarker.jsx'
+import CinematicIntro from '../CinematicIntro/CinematicIntro.jsx'
+import { initIntroState } from '../../hooks/useCinematicIntro'
 import './MoonUniverse.css'
 
 export default function MoonUniverse() {
@@ -28,7 +30,8 @@ export default function MoonUniverse() {
   const freeScrollRef = useRef(false)
   const scrollLockRef = useRef(false)
   const journeyRestartingRef = useRef(false)
-  const journeyFooterRef = useRef(null)
+  const progressBarRef = useRef(null)
+  const moonShellRef = useRef(null)
   const lenis = useLenis()
 
   const outroMessageRef = useRef(null)
@@ -47,6 +50,11 @@ export default function MoonUniverse() {
 
   const [titleVisible, setTitleVisible] = useState(false)
   const [taglineVisible, setTaglineVisible] = useState(false)
+  const [introComplete, setIntroComplete] = useState(false)
+  const [heroRevealing, setHeroRevealing] = useState(false)
+  const [barActivated, setBarActivated] = useState(false)
+  const [introPhase, setIntroPhase] = useState(0)
+  const [moonEmerging, setMoonEmerging] = useState(false)
   const [activeChapter, setActiveChapter] = useState(-1)
   const [scrollProgress, setScrollProgress] = useState(0)
   const [finaleActive, setFinaleActive] = useState(false)
@@ -81,6 +89,20 @@ export default function MoonUniverse() {
     setRestartRevealed(true)
   }, [])
 
+  const handleIntroPhase = useCallback((phase) => {
+    setIntroPhase(phase)
+    if (phase >= 3) setMoonEmerging(true)
+    if (phase === 6) {
+      setHeroRevealing(true)
+      setTitleVisible(true)
+      window.setTimeout(() => setTaglineVisible(true), 1100)
+    }
+  }, [])
+
+  const handleBarActivate = useCallback(() => {
+    setBarActivated(true)
+  }, [])
+
   const { timelineRef, finalSequenceRef } = useCinematicTimeline({
     viewportRef,
     trackRef,
@@ -88,13 +110,25 @@ export default function MoonUniverse() {
     cardRefs,
     pathRefs,
     outroRefs: outroRefs.current,
-    journeyFooterRef,
+    journeyFooterRef: progressBarRef,
     onChapterChange: handleChapterChange,
     onProgressChange: handleProgressChange,
     freeScrollRef,
     onCtaReveal: handleCtaReveal,
     onRestartReveal: handleRestartReveal,
   })
+
+  const handleIntroComplete = useCallback(() => {
+    setIntroComplete(true)
+    scrollLockRef.current = false
+    lenis?.start()
+    timelineRef.current?.scrollTrigger?.enable()
+    requestAnimationFrame(() => ScrollTrigger.refresh())
+  }, [lenis, timelineRef])
+
+  useEffect(() => {
+    initIntroState(cinematicStateRef.current)
+  }, [])
 
   const {
     activeIndex,
@@ -122,7 +156,7 @@ export default function MoonUniverse() {
     timelineRef,
     finalSequenceRef,
     outroRefs: outroRefs.current,
-    journeyFooterRef,
+    journeyFooterRef: progressBarRef,
     cardRefs,
     pathRefs,
     scrollProgress,
@@ -170,7 +204,7 @@ export default function MoonUniverse() {
       state: cinematicStateRef.current,
       timelineRef,
       outroRefs: outroRefs.current,
-      journeyFooterRef,
+      journeyFooterRef: progressBarRef,
       cardRefs,
       pathRefs,
       onProgressChange: handleProgressChange,
@@ -234,32 +268,46 @@ export default function MoonUniverse() {
   }, [lenis])
 
   useEffect(() => {
+    if (!lenis || introComplete) return undefined
+
+    scrollLockRef.current = true
+    lenis.stop()
+    timelineRef.current?.scrollTrigger?.disable()
+
+    const blockScroll = (event) => {
+      if (!introComplete) event.preventDefault()
+    }
+
+    window.addEventListener('wheel', blockScroll, { passive: false })
+    window.addEventListener('touchmove', blockScroll, { passive: false })
+
+    return () => {
+      window.removeEventListener('wheel', blockScroll)
+      window.removeEventListener('touchmove', blockScroll)
+    }
+  }, [lenis, introComplete, timelineRef])
+
+  useEffect(() => {
     if (!lenis) return undefined
 
     window.scrollTo(0, 0)
-    scrollLockRef.current = false
-    freeScrollRef.current = false
     setFinaleActive(false)
     setFinaleComplete(false)
-    lenis.start()
-    lenis.scrollTo(0, { immediate: true })
     resetMarkers()
+
+    if (introComplete) {
+      scrollLockRef.current = false
+      freeScrollRef.current = false
+      lenis.start()
+      lenis.scrollTo(0, { immediate: true })
+    }
 
     const frame = requestAnimationFrame(() => {
       ScrollTrigger.refresh()
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [lenis, resetMarkers])
-
-  useEffect(() => {
-    const titleFrame = requestAnimationFrame(() => setTitleVisible(true))
-    const taglineTimer = window.setTimeout(() => setTaglineVisible(true), 900)
-    return () => {
-      cancelAnimationFrame(titleFrame)
-      window.clearTimeout(taglineTimer)
-    }
-  }, [])
+  }, [lenis, resetMarkers, introComplete])
 
   const headerOpacity = getHeaderOpacity(scrollProgress)
   const isExploring = scrollProgress > 0.04
@@ -311,10 +359,19 @@ export default function MoonUniverse() {
     activeIndex >= 0
 
   return (
-    <div className="cinematic">
+    <div
+      className={`cinematic ${!introComplete ? 'is-intro-active' : ''} ${!introComplete && introPhase < 3 ? 'is-intro-title-only' : ''}`}
+    >
+      <TopProgressBar
+        ref={progressBarRef}
+        progress={scrollProgress}
+        activated={barActivated}
+        introMode={!introComplete}
+      />
+
       <div
         ref={viewportRef}
-        className={`cinematic__viewport ${isExploring ? 'is-exploring' : ''} ${isMarkerFlow ? 'is-marker-flow' : ''} ${isCardNavigable ? 'is-card-navigable' : ''} ${finaleActive ? 'is-finale' : ''} ${finaleComplete ? 'is-finale-complete' : ''} ${isMoonDrag ? 'is-moon-drag' : ''}`}
+        className={`cinematic__viewport ${isExploring ? 'is-exploring' : ''} ${isMarkerFlow ? 'is-marker-flow' : ''} ${isCardNavigable ? 'is-card-navigable' : ''} ${finaleActive ? 'is-finale' : ''} ${finaleComplete ? 'is-finale-complete' : ''} ${isMoonDrag ? 'is-moon-drag' : ''} ${heroRevealing ? 'is-hero-revealing' : ''}`}
       >
         <div className="cinematic__vignette" aria-hidden="true" />
         <div ref={finaleShadeRef} className="cinematic__finale-shade" aria-hidden="true" />
@@ -323,9 +380,9 @@ export default function MoonUniverse() {
         <header
           className="cinematic__header"
           style={{
-            opacity: headerOpacity,
-            visibility: headerOpacity < 0.02 ? 'hidden' : 'visible',
-            pointerEvents: headerOpacity < 0.15 ? 'none' : 'auto',
+            opacity: introComplete ? headerOpacity : 0,
+            visibility: !introComplete || headerOpacity < 0.02 ? 'hidden' : 'visible',
+            pointerEvents: !introComplete || headerOpacity < 0.15 ? 'none' : 'auto',
           }}
         >
           <h2 className={titleVisible ? 'is-visible' : ''}>
@@ -336,15 +393,19 @@ export default function MoonUniverse() {
           </p>
         </header>
 
-        <div className="cinematic__moon">
+        <div
+          ref={moonShellRef}
+          className={`cinematic__moon ${moonEmerging ? 'is-emerging' : ''} ${!introComplete && !moonEmerging ? 'is-intro-hidden' : ''}`}
+        >
           <MoonHero
-            visible={titleVisible}
+            visible
+            introDormant={!introComplete}
             cinematicStateRef={cinematicStateRef}
-            moonDragEnabled={moonDragEnabled && !finaleActive}
+            moonDragEnabled={moonDragEnabled && !finaleActive && introComplete}
           />
         </div>
 
-        {!finaleActive && !isMoonDrag ? (
+        {!introComplete && !finaleActive && !isMoonDrag ? (
           <ScreenCenterMarker
             cinematicStateRef={cinematicStateRef}
             activeIndex={activeIndex}
@@ -392,19 +453,18 @@ export default function MoonUniverse() {
           restartInteractive={restartRevealed}
           aria-hidden={!finaleActive}
         />
-
-        <footer
-          ref={journeyFooterRef}
-          className="cinematic__footer"
-          aria-hidden={finaleActive || finaleComplete}
-        >
-          <JourneyProgress
-            progress={scrollProgress}
-            activeChapter={journeyChapter}
-            onSeek={finaleActive || finaleComplete ? undefined : seekToProgress}
-          />
-        </footer>
       </div>
+
+      {!introComplete ? (
+        <CinematicIntro
+          cinematicStateRef={cinematicStateRef}
+          progressBarRef={progressBarRef}
+          moonShellRef={moonShellRef}
+          onPhaseChange={handleIntroPhase}
+          onBarActivate={handleBarActivate}
+          onComplete={handleIntroComplete}
+        />
+      ) : null}
 
       <div
         ref={trackRef}

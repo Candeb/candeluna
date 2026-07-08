@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -61,41 +61,6 @@ export function MoonLimbGlow({ radius }) {
   )
 }
 
-function SpaceDust() {
-  const pointsRef = useRef()
-  const count = 120
-
-  const geometry = useMemo(() => {
-    const positions = new Float32Array(count * 3)
-    for (let i = 0; i < count; i += 1) {
-      positions[i * 3] = (Math.random() - 0.5) * 14
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 10
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 8 - 2
-    }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    return geo
-  }, [])
-
-  useFrame(({ clock }) => {
-    if (!pointsRef.current) return
-    pointsRef.current.rotation.y = clock.elapsedTime * 0.012
-  })
-
-  return (
-    <points ref={pointsRef} geometry={geometry}>
-      <pointsMaterial
-        size={0.012}
-        color="#d8e8ff"
-        transparent
-        opacity={0.35}
-        sizeAttenuation
-        depthWrite={false}
-      />
-    </points>
-  )
-}
-
 export default function AmbientSpaceEffects() {
-  return <SpaceDust />
+  return null
 }

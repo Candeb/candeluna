@@ -39,6 +39,11 @@ body {
   text-size-adjust: 100%;
 }
 
+:root {
+  --intro-luminance: 1;
+  --intro-shade-opacity: 0.65;
+}
+
 a {
   color: inherit;
 }

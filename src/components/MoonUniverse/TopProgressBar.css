@@ -1,0 +1,62 @@
+.top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  height: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+.top-progress.is-active {
+  opacity: 1;
+}
+
+.top-progress--intro {
+  z-index: 103;
+}
+
+.top-progress__track {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.top-progress__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0.0001);
+  background: linear-gradient(
+    90deg,
+    rgba(125, 211, 252, 0.55) 0%,
+    rgba(192, 132, 252, 0.75) 55%,
+    rgba(224, 242, 254, 0.9) 100%
+  );
+  will-change: transform;
+}
+
+.top-progress.is-active .top-progress__fill {
+  box-shadow: 0 0 12px rgba(125, 211, 252, 0.35);
+}
+
+.top-progress__glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(125, 211, 252, 0.25) 50%,
+    transparent 100%
+  );
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.top-progress.is-active .top-progress__glow {
+  opacity: 1;
+}

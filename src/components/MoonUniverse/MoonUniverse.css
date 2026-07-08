@@ -31,7 +31,7 @@
 
 .cinematic__header {
   position: absolute;
-  top: clamp(28px, 6vh, 56px);
+  top: clamp(48px, 10vh, 72px);
   left: 0;
   right: 0;
   z-index: 5;
@@ -41,7 +41,8 @@
   pointer-events: none;
 }
 
-.cinematic__header h1 {
+.cinematic__header h1,
+.cinematic__header h2 {
   margin: 0;
   color: #fff;
   font-size: clamp(26px, 4.8vw, 46px);
@@ -56,7 +57,8 @@
     filter 1.8s ease;
 }
 
-.cinematic__header h1.is-visible {
+.cinematic__header h1.is-visible,
+.cinematic__header h2.is-visible {
   opacity: 1;
   transform: translateY(0);
   filter: blur(0);
@@ -89,6 +91,24 @@
   justify-content: center;
   overflow: visible;
   pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+
+.cinematic__moon.is-intro-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cinematic.is-intro-title-only .cinematic__vignette {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.cinematic.is-intro-title-only .cinematic__moon {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .cinematic__viewport.is-exploring .cinematic__moon {
@@ -157,6 +177,43 @@
 
 .cinematic__viewport.is-marker-flow .screen-marker {
   z-index: 12;
+}
+
+.cinematic__progress-header {
+  position: absolute;
+  top: calc(var(--safe-top, 0px) + 10px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cinematic__progress-header .journey__bar {
+  order: -1;
+}
+
+.cinematic__progress-header .journey {
+  gap: 8px;
+}
+
+.cinematic__progress-header > * {
+  pointer-events: auto;
+}
+
+.cinematic.is-intro-active .cinematic__header,
+.cinematic.is-intro-active .cinematic__cards {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cinematic__viewport.is-hero-revealing .cinematic__header,
+.cinematic__viewport.is-hero-revealing .cinematic__vignette {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1.5s ease, visibility 1.5s ease;
 }
 
 .cinematic__footer {
@@ -244,7 +301,8 @@
   pointer-events: none !important;
 }
 
-.cinematic__viewport.is-finale-complete .cinematic__footer {
+.cinematic__viewport.is-finale-complete .cinematic__progress-header,
+.cinematic__viewport.is-finale-complete .top-progress {
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;

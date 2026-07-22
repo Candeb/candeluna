@@ -176,7 +176,7 @@
 }
 
 .cinematic__viewport.is-marker-flow .screen-marker {
-  z-index: 12;
+  z-index: 22;
 }
 
 .cinematic__progress-header {
@@ -207,6 +207,37 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.cinematic.is-service-overlay {
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Presencia Digital: luna visible de fondo, UI del viaje oculta */
+.cinematic.is-service-overlay.is-service-moon-backdrop {
+  opacity: 1;
+  visibility: visible;
+}
+
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__header,
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__cards,
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__vignette,
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__finale-shade,
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__finale-stars,
+.cinematic.is-service-overlay.is-service-moon-backdrop .screen-marker,
+.cinematic.is-service-overlay.is-service-moon-backdrop .top-progress,
+.cinematic.is-service-overlay.is-service-moon-backdrop .journey {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.cinematic.is-service-overlay.is-service-moon-backdrop .cinematic__moon {
+  opacity: 1;
+  visibility: visible;
+  filter: brightness(0.55) contrast(1.04) saturate(0.9);
 }
 
 .cinematic__viewport.is-hero-revealing .cinematic__header,

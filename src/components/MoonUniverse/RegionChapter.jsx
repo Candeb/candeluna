@@ -4,7 +4,7 @@ import RegionConnector from './RegionConnector.jsx'
 import './RegionChapter.css'
 
 const RegionChapter = forwardRef(function RegionChapter(
-  { shot, index, side, cardInteractive = false, isActive = false, connectorRef },
+  { shot, index, side, cardInteractive = false, isActive = false, connectorRef, onBeforeNavigate },
   ref,
 ) {
   const placement = shot.cardPlacement ?? 'mid'
@@ -23,6 +23,7 @@ const RegionChapter = forwardRef(function RegionChapter(
             side={side}
             regionLabel={shot.regionLabel}
             isInteractive={cardInteractive}
+            onBeforeNavigate={onBeforeNavigate}
           />
         </div>
       </div>

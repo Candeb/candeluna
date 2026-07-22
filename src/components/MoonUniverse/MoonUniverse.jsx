@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useLenis } from 'lenis/react'
+import { useLocation } from 'react-router-dom'
 import { moonShots, SCROLL_HEIGHT_VH } from '../../data/moonShots'
 import { getHeaderOpacity } from '../../data/cinematicTimeline'
 import {
@@ -18,10 +19,20 @@ import TopProgressBar from './TopProgressBar.jsx'
 import FinalOutro from './FinalOutro.jsx'
 import ScreenCenterMarker from './ScreenCenterMarker.jsx'
 import CinematicIntro from '../CinematicIntro/CinematicIntro.jsx'
-import { initIntroState } from '../../hooks/useCinematicIntro'
+import { applyPostIntroState, initIntroState } from '../../hooks/useCinematicIntro'
+import {
+  hasIntroCompleted,
+  loadJourneyProgress,
+  markIntroComplete,
+  saveJourneyProgress,
+} from '../../utils/journeySession'
+import { setServiceMoonScrollHandler } from '../../utils/serviceMoonBridge'
 import './MoonUniverse.css'
 
 export default function MoonUniverse() {
+  const location = useLocation()
+  const serviceOverlayOpen = location.pathname.startsWith('/servicios/')
+  const presenceMoonBackdrop = location.pathname.includes('/servicios/landing-pages')
   const viewportRef = useRef(null)
   const trackRef = useRef(null)
   const cinematicStateRef = useRef(createCinematicState())
@@ -32,6 +43,9 @@ export default function MoonUniverse() {
   const journeyRestartingRef = useRef(false)
   const progressBarRef = useRef(null)
   const moonShellRef = useRef(null)
+  const restoreDoneRef = useRef(false)
+  const skipIntroRef = useRef(hasIntroCompleted())
+  const scrollProgressRef = useRef(loadJourneyProgress() ?? 0)
   const lenis = useLenis()
 
   const outroMessageRef = useRef(null)
@@ -48,15 +62,17 @@ export default function MoonUniverse() {
     stars: finaleStarsRef,
   })
 
-  const [titleVisible, setTitleVisible] = useState(false)
-  const [taglineVisible, setTaglineVisible] = useState(false)
-  const [introComplete, setIntroComplete] = useState(false)
-  const [heroRevealing, setHeroRevealing] = useState(false)
-  const [barActivated, setBarActivated] = useState(false)
-  const [introPhase, setIntroPhase] = useState(0)
-  const [moonEmerging, setMoonEmerging] = useState(false)
+  const skipIntro = skipIntroRef.current
+
+  const [titleVisible, setTitleVisible] = useState(skipIntro)
+  const [taglineVisible, setTaglineVisible] = useState(skipIntro)
+  const [introComplete, setIntroComplete] = useState(skipIntro)
+  const [heroRevealing, setHeroRevealing] = useState(skipIntro)
+  const [barActivated, setBarActivated] = useState(skipIntro)
+  const [introPhase, setIntroPhase] = useState(skipIntro ? 6 : 0)
+  const [moonEmerging, setMoonEmerging] = useState(skipIntro)
   const [activeChapter, setActiveChapter] = useState(-1)
-  const [scrollProgress, setScrollProgress] = useState(0)
+  const [scrollProgress, setScrollProgress] = useState(() => loadJourneyProgress() ?? 0)
   const [finaleActive, setFinaleActive] = useState(false)
   const [finaleComplete, setFinaleComplete] = useState(false)
   const [ctaRevealed, setCtaRevealed] = useState(false)
@@ -67,7 +83,13 @@ export default function MoonUniverse() {
   }, [])
 
   const handleProgressChange = useCallback((progress) => {
+    scrollProgressRef.current = progress
     setScrollProgress(progress)
+    if (hasIntroCompleted()) saveJourneyProgress(progress)
+  }, [])
+
+  const handleBeforeServiceNavigate = useCallback(() => {
+    saveJourneyProgress(scrollProgressRef.current)
   }, [])
 
   const handleFinaleStart = useCallback(() => {
@@ -119,6 +141,7 @@ export default function MoonUniverse() {
   })
 
   const handleIntroComplete = useCallback(() => {
+    markIntroComplete()
     setIntroComplete(true)
     scrollLockRef.current = false
     lenis?.start()
@@ -127,8 +150,12 @@ export default function MoonUniverse() {
   }, [lenis, timelineRef])
 
   useEffect(() => {
-    initIntroState(cinematicStateRef.current)
-  }, [])
+    if (skipIntro) {
+      applyPostIntroState(cinematicStateRef.current)
+    } else {
+      initIntroState(cinematicStateRef.current)
+    }
+  }, [skipIntro])
 
   const {
     activeIndex,
@@ -171,7 +198,7 @@ export default function MoonUniverse() {
   })
 
   const seekToProgress = useCallback(
-    (progress) => {
+    (progress, { immediate = false } = {}) => {
       if (finaleActive || finaleComplete) return
 
       const st = timelineRef.current?.scrollTrigger
@@ -183,6 +210,15 @@ export default function MoonUniverse() {
       freeScrollRef.current = true
       scrollLockRef.current = false
       lenis.start()
+      cinematicStateRef.current.forceCameraSnap = true
+
+      if (immediate) {
+        window.scrollTo(0, y)
+        lenis.scrollTo(y, { immediate: true })
+        freeScrollRef.current = false
+        return
+      }
+
       lenis.scrollTo(y, {
         duration: 1.35,
         onComplete: () => {
@@ -217,6 +253,7 @@ export default function MoonUniverse() {
     setRestartRevealed(false)
     setScrollProgress(0)
     setActiveChapter(-1)
+    saveJourneyProgress(0)
 
     document.documentElement.style.setProperty('--finale-video-dim', '1')
     document.documentElement.style.removeProperty('--moon-backdrop-opacity')
@@ -287,31 +324,115 @@ export default function MoonUniverse() {
     }
   }, [lenis, introComplete, timelineRef])
 
+  /** Servicio abierto por encima: congelar luna y scroll; al volver todo sigue igual */
   useEffect(() => {
-    if (!lenis) return undefined
+    if (!serviceOverlayOpen || !lenis) return undefined
 
-    window.scrollTo(0, 0)
-    setFinaleActive(false)
-    setFinaleComplete(false)
-    resetMarkers()
+    lenis.stop()
+    cinematicStateRef.current.forceCameraSnap = true
 
-    if (introComplete) {
-      scrollLockRef.current = false
-      freeScrollRef.current = false
-      lenis.start()
-      lenis.scrollTo(0, { immediate: true })
+    return () => {
+      // Si la tarjeta sigue abierta, los markers mantienen el lock
+      if (!scrollLockRef.current && introComplete) {
+        lenis.start()
+      }
+    }
+  }, [serviceOverlayOpen, lenis, introComplete])
+
+  /** Presencia Digital: mismo zoom de la tarjeta + giro lento con scroll */
+  useEffect(() => {
+    if (!serviceOverlayOpen || !presenceMoonBackdrop) {
+      setServiceMoonScrollHandler(null)
+      const state = cinematicStateRef.current
+      if (state) {
+        state.serviceMoonSpin = false
+        state.serviceMoonFreezeCamera = null
+      }
+      return undefined
     }
 
-    const frame = requestAnimationFrame(() => {
-      ScrollTrigger.refresh()
+    const state = cinematicStateRef.current
+    const hold = state.zoomHold
+    const freezeCamera = hold
+      ? {
+          camera: { ...hold.camera },
+          target: { ...hold.target },
+          fov: hold.fov,
+        }
+      : {
+          camera: { ...state.camera },
+          target: { ...state.target },
+          fov: state.fov,
+        }
+
+    state.serviceMoonSpin = true
+    state.serviceMoonProgress = 0
+    state.serviceMoonBaseX = state.moon?.x ?? 0.04
+    state.serviceMoonBaseY = state.moon?.y ?? 0
+    state.serviceMoonFreezeCamera = freezeCamera
+    state.moonHold = null
+    state.moonUserLocked = false
+    state.forceCameraSnap = false
+
+    setServiceMoonScrollHandler((progress) => {
+      state.serviceMoonProgress = progress
     })
 
+    return () => {
+      setServiceMoonScrollHandler(null)
+      state.serviceMoonSpin = false
+      state.serviceMoonProgress = 0
+      state.serviceMoonFreezeCamera = null
+    }
+  }, [serviceOverlayOpen, presenceMoonBackdrop])
+
+  useEffect(() => {
+    if (!lenis || !introComplete || restoreDoneRef.current) return undefined
+
+    restoreDoneRef.current = true
+
+    if (skipIntro) {
+      const saved = loadJourneyProgress()
+      const target = saved != null && saved > 0.002 ? saved : 0
+
+      scrollLockRef.current = false
+      freeScrollRef.current = true
+      lenis.start()
+      timelineRef.current?.scrollTrigger?.enable()
+
+      let attempts = 0
+      let raf = 0
+      const tryRestore = () => {
+        ScrollTrigger.refresh()
+        const st = timelineRef.current?.scrollTrigger
+        if (!st) {
+          attempts += 1
+          if (attempts < 40) raf = requestAnimationFrame(tryRestore)
+          else freeScrollRef.current = false
+          return
+        }
+        const y = st.start + target * (st.end - st.start)
+        cinematicStateRef.current.forceCameraSnap = true
+        window.scrollTo(0, y)
+        lenis.scrollTo(y, { immediate: true })
+        setScrollProgress(target)
+        freeScrollRef.current = false
+      }
+      raf = requestAnimationFrame(tryRestore)
+      return () => cancelAnimationFrame(raf)
+    }
+
+    scrollLockRef.current = false
+    freeScrollRef.current = false
+    lenis.start()
+    timelineRef.current?.scrollTrigger?.enable()
+    const frame = requestAnimationFrame(() => ScrollTrigger.refresh())
     return () => cancelAnimationFrame(frame)
-  }, [lenis, resetMarkers, introComplete])
+  }, [lenis, introComplete, timelineRef, skipIntro])
 
   const headerOpacity = getHeaderOpacity(scrollProgress)
   const isExploring = scrollProgress > 0.04
-  const isMoonDrag = moonDragEnabled && !finaleActive
+  const isMoonDrag = moonDragEnabled && !finaleActive && !serviceOverlayOpen
   const journeyChapter =
     phase === MARKER_PHASE.CARD && cardReady
       ? activeIndex
@@ -360,7 +481,9 @@ export default function MoonUniverse() {
 
   return (
     <div
-      className={`cinematic ${!introComplete ? 'is-intro-active' : ''} ${!introComplete && introPhase < 3 ? 'is-intro-title-only' : ''}`}
+      className={`cinematic ${!introComplete ? 'is-intro-active' : ''} ${!introComplete && introPhase < 3 ? 'is-intro-title-only' : ''} ${serviceOverlayOpen ? 'is-service-overlay' : ''} ${serviceOverlayOpen && presenceMoonBackdrop ? 'is-service-moon-backdrop' : ''}`}
+      aria-hidden={serviceOverlayOpen && !presenceMoonBackdrop ? true : undefined}
+      inert={serviceOverlayOpen ? '' : undefined}
     >
       <TopProgressBar
         ref={progressBarRef}
@@ -385,12 +508,10 @@ export default function MoonUniverse() {
             pointerEvents: !introComplete || headerOpacity < 0.15 ? 'none' : 'auto',
           }}
         >
-          <h2 className={titleVisible ? 'is-visible' : ''}>
-          Desarrollo productos digitales que conectan ideas, personas y sistemas.
-          </h2>
-          <p className={`cinematic__tagline ${taglineVisible ? 'is-visible' : ''}`}>
+       
+          <h3 className={`cinematic__tagline ${taglineVisible ? 'is-visible' : ''}`}>
             Explorá el universo de soluciones
-          </p>
+          </h3>
         </header>
 
         <div
@@ -405,7 +526,7 @@ export default function MoonUniverse() {
           />
         </div>
 
-        {!introComplete && !finaleActive && !isMoonDrag ? (
+        {!finaleActive && !isMoonDrag && introComplete ? (
           <ScreenCenterMarker
             cinematicStateRef={cinematicStateRef}
             activeIndex={activeIndex}
@@ -440,6 +561,7 @@ export default function MoonUniverse() {
                   phase === MARKER_PHASE.CARD ||
                   phase === MARKER_PHASE.EXITING)
               }
+              onBeforeNavigate={handleBeforeServiceNavigate}
             />
           ))}
         </div>

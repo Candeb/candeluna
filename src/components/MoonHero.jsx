@@ -327,12 +327,19 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
     const cameraSmooth = isMobile ? CAMERA_SMOOTH_MOBILE : CAMERA_SMOOTH
     const snapNow = Boolean(state.forceCameraSnap)
     const introEmerging = Boolean(state.introEmerging)
+    const serviceSpin = Boolean(state.serviceMoonSpin)
     const egress = state.zoomHoldEgress
     const frozen =
-      (state.approachFrozen || state.zoomHoldActive) && !egress
-    const zoomHold = state.zoomHoldActive ? state.zoomHold : null
+      (state.approachFrozen || state.zoomHoldActive) && !egress && !serviceSpin
+    const zoomHold = !serviceSpin && state.zoomHoldActive ? state.zoomHold : null
 
-    if (egress && zoomHold) {
+    if (serviceSpin && state.serviceMoonFreezeCamera) {
+      const hold = state.serviceMoonFreezeCamera
+      camera.position.set(hold.camera.x, hold.camera.y, hold.camera.z)
+      camera.fov = hold.fov
+      camera.updateProjectionMatrix()
+      state.forceCameraSnap = false
+    } else if (egress && zoomHold) {
       const elapsed = performance.now() - egress.startTime
       const t = Math.min(1, elapsed / (egress.duration * 1000))
       const ease = t * t * (3 - 2 * t)
@@ -383,7 +390,10 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
       }
     }
 
-    const lookTarget = zoomHold?.target ?? state.target
+    const lookTarget =
+      (serviceSpin && state.serviceMoonFreezeCamera?.target) ||
+      zoomHold?.target ||
+      state.target
     lookAt.set(lookTarget.x, lookTarget.y, lookTarget.z)
     camera.lookAt(lookAt)
 
@@ -421,7 +431,18 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
     if (moonRef.current) {
       const drag = state.moonDrag ?? createMoonDragState()
 
-      if (state.moonUserLocked && state.moonUserQuat) {
+      if (serviceSpin) {
+        const p = state.serviceMoonProgress ?? 0
+        const baseX = state.serviceMoonBaseX ?? 0
+        const baseY = state.serviceMoonBaseY ?? 0
+        _euler.set(
+          baseX + Math.sin(p * Math.PI) * 0.12,
+          baseY + p * Math.PI * 1.15,
+          0,
+        )
+        _targetQuat.setFromEuler(_euler)
+        moonRef.current.quaternion.slerp(_targetQuat, 0.07)
+      } else if (state.moonUserLocked && state.moonUserQuat) {
         _targetQuat.copy(state.moonUserQuat)
       } else if (state.moonHold) {
         state.moon.x = state.moonHold.x
@@ -438,17 +459,19 @@ function CinematicMoonScene({ cinematicStateRef, moonDragEnabled }) {
         }
       }
 
-      const smooth =
-        moonDragEnabled && state.dragEnabled
-          ? MOON_DRAG_SMOOTH
-          : state.moonUserLocked
-            ? 1
-            : MOON_SMOOTH
+      if (!serviceSpin) {
+        const smooth =
+          moonDragEnabled && state.dragEnabled
+            ? MOON_DRAG_SMOOTH
+            : state.moonUserLocked
+              ? 1
+              : MOON_SMOOTH
 
-      if (snapNow) {
-        moonRef.current.quaternion.copy(_targetQuat)
-      } else if (!frozen) {
-        moonRef.current.quaternion.slerp(_targetQuat, smooth)
+        if (snapNow) {
+          moonRef.current.quaternion.copy(_targetQuat)
+        } else if (!frozen) {
+          moonRef.current.quaternion.slerp(_targetQuat, smooth)
+        }
       }
 
       if (state.moonUserLocked && journeySection === 0 && !state.moonHold) {

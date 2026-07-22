@@ -32,7 +32,7 @@ body,
 
 body {
   font-family: var(--sans);
-  background: #030308;
+  background: #010104;
   color: #fff;
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
@@ -41,7 +41,7 @@ body {
 
 :root {
   --intro-luminance: 1;
-  --intro-shade-opacity: 0.65;
+  --intro-shade-opacity: 0.7;
 }
 
 a {

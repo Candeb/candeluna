@@ -103,4 +103,4 @@ export const INTRO_ATMOSPHERE = {
 
 export const INTRO_LUMINANCE_END = 1
 export const INTRO_VIDEO_DIM_END = 1
-export const INTRO_SHADE_JOURNEY = 0.65
+export const INTRO_SHADE_JOURNEY = 0.7

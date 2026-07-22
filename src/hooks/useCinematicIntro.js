@@ -430,3 +430,24 @@ export function initIntroState(state) {
   state.forceCameraSnap = true
   applyIntroAtmosphere(state)
 }
+
+/** Estado listo para el recorrido (sin volver a pasar la intro) */
+export function applyPostIntroState(state) {
+  if (!state) return
+  applyLighting(state, INTRO_LIGHT_FULL)
+  state.moonVisible = 1
+  state.introEmerging = false
+  state.stars = 0
+  Object.assign(state.camera, INTRO_SHOT.camera)
+  Object.assign(state.target, INTRO_SHOT.target)
+  Object.assign(state.moon, INTRO_SHOT.moon)
+  state.fov = INTRO_SHOT.fov
+  state.forceCameraSnap = true
+  state.videoDim = INTRO_VIDEO_DIM_END
+  setUniverseLuminance(INTRO_LUMINANCE_END)
+  setIntroShade(INTRO_SHADE_JOURNEY)
+  document.documentElement.style.setProperty(
+    '--finale-video-dim',
+    String(INTRO_VIDEO_DIM_END),
+  )
+}

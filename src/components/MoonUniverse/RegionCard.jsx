@@ -7,7 +7,7 @@ function RegionCardContent({ service, index, side, regionLabel }) {
 
   return (
     <>
-      <span className="region-card__index">{orbitNumber}</span>
+      
       {regionLabel ? (
         <span className="region-card__region">{regionLabel}</span>
       ) : null}
@@ -20,7 +20,7 @@ function RegionCardContent({ service, index, side, regionLabel }) {
 }
 
 const RegionCard = forwardRef(function RegionCard(
-  { service, index, side = 'right', regionLabel, isInteractive = false },
+  { service, index, side = 'right', regionLabel, isInteractive = false, onBeforeNavigate },
   ref,
 ) {
   const navigate = useNavigate()
@@ -30,6 +30,7 @@ const RegionCard = forwardRef(function RegionCard(
 
   const goToService = () => {
     if (!isInteractive) return
+    onBeforeNavigate?.()
     navigate(`/servicios/${service.slug}`)
   }
 

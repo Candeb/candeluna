@@ -506,34 +506,26 @@ export function useMarkers({
 
         const entryTiming = getMarkerTiming(Boolean(cinematicStateRef.current?.isMobile))
 
+        // 1) Marcador ya visible — beat de exploración
         tl.to({}, { duration: entryTiming.beaconToLinePause })
 
+        // 2) Línea que une marcador y tarjeta
         tl.add(animateLineDraw({ ...els, cinematicStateRef }))
 
+        // 3) Beat y luego la tarjeta
+        tl.to({}, { duration: entryTiming.lineToCardPause ?? 0.35 })
         tl.call(() => setPhaseSync(MARKER_PHASE.CARD))
-
         tl.add(
-
           animateCardIn({
-
             revealEl: els.revealEl,
-
             linkEl: els.linkEl,
-
             cinematicStateRef,
-
             onReady: () => {
-
               setCardReady(true)
-
               onSectionOpen?.(index)
-
               unlockScroll()
-
             },
-
           }),
-
         )
 
 

@@ -6,7 +6,6 @@
 export const MOON_REGIONS = {
   'landing-pages': {
     region: 'mares',
-    label: 'Mares tranquilos',
     moon: { x: 0.05, y: 0.38 },
     contemplateRotate: 0.22,
     hotspot: { lat: 0.52, lon: 0.42, radius: 0.9 },
@@ -19,7 +18,6 @@ export const MOON_REGIONS = {
   },
   automatizacion: {
     region: 'crater',
-    label: 'Gran cráter',
     moon: { x: 0.34, y: 1.68 },
     contemplateRotate: 0.26,
     hotspot: { lat: -0.28, lon: 1.65, radius: 0.94 },
@@ -32,7 +30,6 @@ export const MOON_REGIONS = {
   },
   'integracion-apis': {
     region: 'rugosa',
-    label: 'Terreno rugoso',
     moon: { x: 0.5, y: 2.88 },
     contemplateRotate: 0.24,
     hotspot: { lat: 0.62, lon: 3.28, radius: 0.88 },
@@ -45,7 +42,6 @@ export const MOON_REGIONS = {
   },
   'desarrollo-a-medida': {
     region: 'meseta',
-    label: 'Meseta elevada',
     moon: { x: 0.24, y: 4.05 },
     contemplateRotate: 0.28,
     hotspot: { lat: -0.55, lon: 4.22, radius: 0.91 },
@@ -58,7 +54,6 @@ export const MOON_REGIONS = {
   },
   contacto: {
     region: 'terminador',
-    label: 'Borde iluminado',
     moon: { x: 0.1, y: 5.15 },
     contemplateRotate: 0.2,
     hotspot: { lat: 0.08, lon: 5.55, radius: 0.89 },

@@ -1,10 +1,45 @@
-.service-page {
-  position: relative;
-  z-index: 3;
-  min-height: 100vh;
+.service-page--overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  background: transparent;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.service-page--overlay.service-page--expanded {
+  background: radial-gradient(
+    ellipse at 50% 28%,
+    rgba(1, 1, 4, 0.22) 0%,
+    rgba(1, 1, 4, 0.42) 55%,
+    rgba(1, 1, 4, 0.62) 100%
+  );
+}
+
+.service-page--overlay:not(.service-page--expanded) {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(28, 36, 58, 0.92) 0%, rgba(6, 8, 16, 0.97) 55%),
+    #060810;
+}
+
+.service-page__panel {
+  width: min(720px, 100%);
+  min-height: 100%;
   padding: 48px 24px 80px;
-  max-width: 720px;
-  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.service-page__panel--presence {
+  width: min(1120px, 100%);
+  min-height: 100%;
+  padding: 0 clamp(24px, 4vw, 48px) clamp(80px, 14vh, 140px);
+  box-sizing: border-box;
 }
 
 .service-page__back {
@@ -16,6 +51,20 @@
   text-transform: uppercase;
   color: rgba(160, 210, 255, 0.7);
   text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.service-page__back--fixed {
+  position: fixed;
+  top: max(20px, calc(var(--safe-top, 0px) + 16px));
+  left: max(20px, calc(var(--safe-left, 0px) + 16px));
+  z-index: 210;
+  margin: 0;
+  padding: 8px 4px;
+}
+
+.service-page__back:hover {
+  color: rgba(224, 242, 254, 0.95);
 }
 
 .service-page__tag {
@@ -32,10 +81,12 @@
   margin: 0 0 16px;
   font-size: clamp(32px, 6vw, 48px);
   letter-spacing: -0.03em;
+  color: #f4f7ff;
 }
 
 .service-page__summary {
   margin: 0 0 32px;
+  max-width: 42ch;
   font-size: 16px;
   line-height: 1.6;
   color: rgba(220, 230, 255, 0.72);
@@ -47,11 +98,19 @@
 }
 
 @media (max-width: 768px) {
-  .service-page {
+  .service-page__panel {
     padding:
       max(20px, var(--safe-top))
       max(16px, var(--safe-right))
       max(56px, var(--safe-bottom))
+      max(16px, var(--safe-left));
+  }
+
+  .service-page__panel--presence {
+    padding:
+      0
+      max(16px, var(--safe-right))
+      max(64px, var(--safe-bottom))
       max(16px, var(--safe-left));
   }
 

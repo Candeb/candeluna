@@ -73,3 +73,8 @@
     top: 44%;
   }
 }
+
+.screen-marker__pin svg path {
+  fill: #462580;
+  stroke: white;
+}

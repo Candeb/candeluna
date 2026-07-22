@@ -8,12 +8,17 @@ import CursorStars from './components/CursorStars.jsx'
 import Home from './pages/Home.jsx'
 import ServicePage from './pages/ServicePage.jsx'
 
-function Shell({ children }) {
+function AppShell() {
   return (
     <>
       <VideoScrollBackground />
       <CursorStars />
-      {children}
+      {/* El universo lunar permanece montado: el servicio se abre por encima */}
+      <Home />
+      <Routes>
+        <Route path="/servicios/:slug" element={<ServicePage />} />
+        <Route path="*" element={null} />
+      </Routes>
     </>
   )
 }
@@ -22,24 +27,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <SmoothScroll>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Shell>
-                <Home />
-              </Shell>
-            }
-          />
-          <Route
-            path="/servicios/:slug"
-            element={
-              <Shell>
-                <ServicePage />
-              </Shell>
-            }
-          />
-        </Routes>
+        <AppShell />
       </SmoothScroll>
     </BrowserRouter>
   </StrictMode>,
